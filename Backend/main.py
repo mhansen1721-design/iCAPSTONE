@@ -1,68 +1,113 @@
+import json
+import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
 app = FastAPI()
+JSON_FILE = "db_patients.json"
 
-db_patients = {
+# --- Persistent Storage Logic ---
+def save_db():
+    with open(JSON_FILE, "w") as f:
+        json.dump(db_patients, f, indent=4)
+
+def load_db():
+    if os.path.exists(JSON_FILE):
+        with open(JSON_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+# Initialize DB from file or use your default
+db_patients = load_db() or {
     "caregiver_admin": {
+        "full_name": "Admin User",
+        "email": "admin@icap.com",
         "password": "icap",
-        "patients": [
-            {
-                "patient_id": "P001",
-                "name": "John Doe",
-                "age": 90,
-                "stage": "Middle",
-                "memories": ["Former Carpenter", "Loves Jazz"],
-                "triggers": ["Loud noises"]
-            }
-        ]
+        "patients": []
     }
 }
 
 # --- Data Models ---
-# This defines what the 'info' looks like when updating
-class PatientInfo(BaseModel):
-    name: Optional[str] = None
-    age: Optional[int] = None
-    stage: Optional[str] = None
-    memories: Optional[List[str]] = None
-    triggers: Optional[List[str]] = None
+class CaregiverCreate(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    email: str
 
-# --- 1. Login ---
+class PatientConfig(BaseModel):
+    patient_id: Optional[str] = None
+    name: str
+    age: int
+    stage: str # Early, Medium, Advanced
+    companion_figure: str
+    memories: List[str]
+    triggers: List[str]
+    safe_topics: List[str]
+
+# --- 1. Registration (Flow 1: Create Account) ---
+@app.post("/register")
+def register(data: CaregiverCreate):
+    if data.username in db_patients:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    db_patients[data.username] = {
+        "full_name": data.full_name,
+        "email": data.email,
+        "password": data.password,
+        "patients": []
+    }
+    save_db()
+    return {"success": True, "message": "Account created"}
+
+# --- 2. Login (Triggers "Your Loved Ones" Page) ---
 @app.post("/login")
 def login(username: str, password: str):
-    """Returns True if credentials match, otherwise False."""
     user = db_patients.get(username)
     if user and user["password"] == password:
-        return True
+        # Return caregiver info to display on the dashboard
+        return {
+            "success": True, 
+            "full_name": user["full_name"],
+            "username": username
+        }
+    return {"success": False, "detail": "Login failed"}
+
+# --- 3. Retrieve (Populates the Patient List) ---
+@app.get("/retrieve/{username}")
+def retrieve_patients(username: str):
+    if username not in db_patients:
+        raise HTTPException(status_code=404, detail="Caregiver not found")
+    return db_patients[username]["patients"]
+
+# --- 4. Create/Configure Patient (Flow 1: Add New Profile) ---
+@app.post("/patients/create/{username}")
+def create_patient(username: str, config: PatientConfig):
+    if username not in db_patients:
+        raise HTTPException(status_code=404, detail="Caregiver not found")
+    
+    # Generate simple ID if not provided
+    new_id = config.patient_id or f"P{len(db_patients[username]['patients']) + 1:03}"
+    
+    new_patient = config.model_dump()
+    new_patient["patient_id"] = new_id
+    
+    db_patients[username]["patients"].append(new_patient)
+    save_db()
+    return {"success": True, "patient_id": new_id}
+
+# --- 5. Update (Edit Existing Configuration) ---
+@app.put("/update/{username}/{patient_id}")
+def update_info(username: str, patient_id: str, info: PatientConfig):
+    if username not in db_patients:
+        return False
+        
+    for patient in db_patients[username]["patients"]:
+        if patient["patient_id"] == patient_id:
+            update_data = info.model_dump(exclude_unset=True)
+            patient.update(update_data)
+            save_db()
+            return True
+                
     return False
 
-# --- 2. Retrieve ---
-@app.post("/retrieve")
-def retrieve(username: str, password: str):
-    """Returns the list of patient information for a caregiver."""
-    user = db_patients.get(username)
-    
-    if not user or user["password"] != password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Returns the list of patients associated with this caregiver
-    return user["patients"]
-
-# --- 3. Update Info ---
-@app.put("/update/{patient_id}")
-def update_info(patient_id: str, info: PatientInfo):
-    """
-    Updates patient info based on ID. 
-    Returns True if successful, False if patient not found.
-    """
-    for caregiver in db_patients.values():
-        for patient in caregiver["patients"]:
-            if patient["patient_id"] == patient_id:
-                # Update the patient fields with the new info
-                update_data = info.model_dump(exclude_unset=True)
-                patient.update(update_data)
-                return True
-                
-    return False # Patient ID not found
