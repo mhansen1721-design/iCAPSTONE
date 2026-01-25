@@ -5,109 +5,165 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 app = FastAPI()
-JSON_FILE = "db_patients.json"
+# Filename set to db_patients.json as requested
+DB_FILE = "db_patients.json"
 
-# --- Persistent Storage Logic ---
-def save_db():
-    with open(JSON_FILE, "w") as f:
-        json.dump(db_patients, f, indent=4)
-
+# --- 1. HELPERS ---
 def load_db():
-    if os.path.exists(JSON_FILE):
-        with open(JSON_FILE, "r") as f:
+    """Reads the JSON file and returns the database dictionary."""
+    if not os.path.exists(DB_FILE):
+        return {}
+    with open(DB_FILE, "r") as f:
+        try:
             return json.load(f)
-    return {}
+        except json.JSONDecodeError:
+            return {}
 
-# Initialize DB from file or use your default
-db_patients = load_db() or {
-    "caregiver_admin": {
-        "full_name": "Admin User",
-        "email": "admin@icap.com",
-        "password": "icap",
-        "patients": []
-    }
-}
+def save_db(data):
+    """Writes the updated dictionary back to the JSON file."""
+    with open(DB_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
-# --- Data Models ---
-class CaregiverCreate(BaseModel):
+# --- 2. DATA MODELS ---
+
+class UnifiedRegistration(BaseModel):
+    """Used for the 'Create Account' page to set up caregiver and first patient."""
     username: str
     password: str
     full_name: str
     email: str
-
-class PatientConfig(BaseModel):
-    patient_id: Optional[str] = None
-    name: str
-    age: int
-    stage: str # Early, Medium, Advanced
+    patient_name: str
+    patient_age: int
+    stage: str
     companion_figure: str
     memories: List[str]
     triggers: List[str]
     safe_topics: List[str]
 
-# --- 1. Registration (Flow 1: Create Account) ---
+class PatientUpdate(BaseModel):
+    """Used for adding NEW profiles or UPDATING existing profiles."""
+    patient_id: Optional[str] = None 
+    name: str
+    age: int
+    stage: str
+    companion_figure: str
+    memories: List[str]
+    triggers: List[str]
+    safe_topics: List[str]
+
+# --- 3. AUTHENTICATION & ACCOUNT MANAGEMENT ---
+
 @app.post("/register")
-def register(data: CaregiverCreate):
-    if data.username in db_patients:
+def register(data: UnifiedRegistration):
+    """Creates a caregiver account and their first patient profile."""
+    db = load_db()
+    if data.username in db:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    db_patients[data.username] = {
+    first_patient = {
+        "patient_id": "P-1",
+        "name": data.patient_name,
+        "age": data.patient_age,
+        "stage": data.stage,
+        "companion_figure": data.companion_figure,
+        "memories": data.memories,
+        "triggers": data.triggers,
+        "safe_topics": data.safe_topics
+    }
+    
+    db[data.username] = {
         "full_name": data.full_name,
         "email": data.email,
         "password": data.password,
-        "patients": []
+        "patients": [first_patient]
     }
-    save_db()
-    return {"success": True, "message": "Account created"}
+    save_db(db)
+    return {"success": True, "message": "Account and first patient created."}
 
-# --- 2. Login (Triggers "Your Loved Ones" Page) ---
 @app.post("/login")
 def login(username: str, password: str):
-    user = db_patients.get(username)
+    """Logs in caregiver and returns their patient list."""
+    db = load_db()
+    user = db.get(username)
     if user and user["password"] == password:
-        # Return caregiver info to display on the dashboard
         return {
-            "success": True, 
-            "full_name": user["full_name"],
-            "username": username
+            "success": True,
+            "caregiver_name": user.get("full_name"),
+            "patients": user.get("patients", [])
         }
-    return {"success": False, "detail": "Login failed"}
+    return {"success": False, "message": "Login failed"}
 
-# --- 3. Retrieve (Populates the Patient List) ---
-@app.get("/retrieve/{username}")
-def retrieve_patients(username: str):
-    if username not in db_patients:
+@app.delete("/caregiver/delete/{username}")
+def delete_caregiver_account(username: str):
+    """Wipes the caregiver account and all associated patient profiles from the JSON."""
+    db = load_db()
+    if username not in db:
+        raise HTTPException(status_code=404, detail="Caregiver account not found")
+    
+    del db[username]
+    save_db(db)
+    return {"success": True, "message": f"Account '{username}' deleted successfully."}
+
+# --- 4. PATIENT MANAGEMENT (The Retrieve-Edit-Save Cycle) ---
+
+@app.get("/patients/{username}/{patient_id}")
+def get_patient_to_edit(username: str, patient_id: str):
+    """Retrieves specific patient info to pre-fill the configuration/edit form."""
+    db = load_db()
+    user = db.get(username)
+    if not user:
         raise HTTPException(status_code=404, detail="Caregiver not found")
-    return db_patients[username]["patients"]
 
-# --- 4. Create/Configure Patient (Flow 1: Add New Profile) ---
-@app.post("/patients/create/{username}")
-def create_patient(username: str, config: PatientConfig):
-    if username not in db_patients:
-        raise HTTPException(status_code=404, detail="Caregiver not found")
-    
-    # Generate simple ID if not provided
-    new_id = config.patient_id or f"P{len(db_patients[username]['patients']) + 1:03}"
-    
-    new_patient = config.model_dump()
-    new_patient["patient_id"] = new_id
-    
-    db_patients[username]["patients"].append(new_patient)
-    save_db()
-    return {"success": True, "patient_id": new_id}
-
-# --- 5. Update (Edit Existing Configuration) ---
-@app.put("/update/{username}/{patient_id}")
-def update_info(username: str, patient_id: str, info: PatientConfig):
-    if username not in db_patients:
-        return False
-        
-    for patient in db_patients[username]["patients"]:
+    for patient in user["patients"]:
         if patient["patient_id"] == patient_id:
-            update_data = info.model_dump(exclude_unset=True)
-            patient.update(update_data)
-            save_db()
-            return True
-                
-    return False
+            return patient
+            
+    raise HTTPException(status_code=404, detail="Patient not found")
 
+@app.post("/patients/save/{username}")
+def save_or_update_patient(username: str, data: PatientUpdate):
+    """Saves edited info back to the specific patient or creates a new profile if no ID exists."""
+    db = load_db()
+    if username not in db:
+        raise HTTPException(status_code=404, detail="Caregiver not found")
+
+    patients_list = db[username]["patients"]
+
+    # --- UPDATE EXISTING ---
+    if data.patient_id:
+        found = False
+        for i, p in enumerate(patients_list):
+            if p["patient_id"] == data.patient_id:
+                patients_list[i] = data.model_dump()
+                found = True
+                break
+        
+        if not found:
+            raise HTTPException(status_code=404, detail="Patient ID match failed")
+            
+        save_db(db)
+        return {"success": True, "message": "Patient info updated."}
+
+    # --- CREATE NEW ---
+    else:
+        new_patient = data.model_dump()
+        new_patient["patient_id"] = f"P-{len(patients_list) + 1}"
+        patients_list.append(new_patient)
+        save_db(db)
+        return {"success": True, "message": "New patient profile added.", "patient_id": new_patient["patient_id"]}
+
+@app.delete("/patients/delete/{username}/{patient_id}")
+def delete_patient(username: str, patient_id: str):
+    """Deletes a specific patient profile from a caregiver's list."""
+    db = load_db()
+    if username not in db:
+        raise HTTPException(status_code=404, detail="Caregiver not found")
+
+    original_count = len(db[username]["patients"])
+    db[username]["patients"] = [p for p in db[username]["patients"] if p["patient_id"] != patient_id]
+
+    if len(db[username]["patients"]) == original_count:
+        raise HTTPException(status_code=404, detail="Patient ID not found")
+
+    save_db(db)
+    return {"success": True, "message": "Patient profile removed."}
