@@ -5,12 +5,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 app = FastAPI()
-# Filename set to db_patients.json as requested
 DB_FILE = "db_patients.json"
 
 # --- 1. HELPERS ---
 def load_db():
-    """Reads the JSON file and returns the database dictionary."""
     if not os.path.exists(DB_FILE):
         return {}
     with open(DB_FILE, "r") as f:
@@ -20,14 +18,12 @@ def load_db():
             return {}
 
 def save_db(data):
-    """Writes the updated dictionary back to the JSON file."""
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
 # --- 2. DATA MODELS ---
 
 class UnifiedRegistration(BaseModel):
-    """Used for the 'Create Account' page to set up caregiver and first patient."""
     username: str
     password: str
     full_name: str
@@ -41,7 +37,6 @@ class UnifiedRegistration(BaseModel):
     safe_topics: List[str]
 
 class PatientUpdate(BaseModel):
-    """Used for adding NEW profiles or UPDATING existing profiles."""
     patient_id: Optional[str] = None 
     name: str
     age: int
@@ -53,9 +48,16 @@ class PatientUpdate(BaseModel):
 
 # --- 3. AUTHENTICATION & ACCOUNT MANAGEMENT ---
 
+# NEW: Username Availability Check
+@app.get("/register/check-username/{username}")
+def check_username(username: str):
+    """Checks if a username is already taken during registration."""
+    db = load_db()
+    is_available = username not in db
+    return {"username": username, "available": is_available}
+
 @app.post("/register")
 def register(data: UnifiedRegistration):
-    """Creates a caregiver account and their first patient profile."""
     db = load_db()
     if data.username in db:
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -82,7 +84,6 @@ def register(data: UnifiedRegistration):
 
 @app.post("/login")
 def login(username: str, password: str):
-    """Logs in caregiver and returns their patient list."""
     db = load_db()
     user = db.get(username)
     if user and user["password"] == password:
@@ -91,24 +92,32 @@ def login(username: str, password: str):
             "caregiver_name": user.get("full_name"),
             "patients": user.get("patients", [])
         }
-    return {"success": False, "message": "Login failed"}
+    return {"success": False, "message": "Invalid credentials"}
+
+# NEW: Logout Trigger
+@app.post("/logout")
+def logout(username: str):
+    """
+    Handles logging out. In a stateless JSON setup, this primarily 
+    serves as a signal for the frontend to clear local storage.
+    """
+    # You can add logic here to log session duration for Analytics Flow 3
+    print(f"DEBUG: User {username} logged out.")
+    return {"success": True, "message": "Session terminated."}
 
 @app.delete("/caregiver/delete/{username}")
 def delete_caregiver_account(username: str):
-    """Wipes the caregiver account and all associated patient profiles from the JSON."""
     db = load_db()
     if username not in db:
-        raise HTTPException(status_code=404, detail="Caregiver account not found")
-    
+        raise HTTPException(status_code=404, detail="Caregiver not found")
     del db[username]
     save_db(db)
-    return {"success": True, "message": f"Account '{username}' deleted successfully."}
+    return {"success": True, "message": "Account deleted successfully."}
 
-# --- 4. PATIENT MANAGEMENT (The Retrieve-Edit-Save Cycle) ---
+# --- 4. PATIENT MANAGEMENT ---
 
 @app.get("/patients/{username}/{patient_id}")
 def get_patient_to_edit(username: str, patient_id: str):
-    """Retrieves specific patient info to pre-fill the configuration/edit form."""
     db = load_db()
     user = db.get(username)
     if not user:
@@ -117,19 +126,16 @@ def get_patient_to_edit(username: str, patient_id: str):
     for patient in user["patients"]:
         if patient["patient_id"] == patient_id:
             return patient
-            
     raise HTTPException(status_code=404, detail="Patient not found")
 
 @app.post("/patients/save/{username}")
 def save_or_update_patient(username: str, data: PatientUpdate):
-    """Saves edited info back to the specific patient or creates a new profile if no ID exists."""
     db = load_db()
     if username not in db:
         raise HTTPException(status_code=404, detail="Caregiver not found")
 
     patients_list = db[username]["patients"]
 
-    # --- UPDATE EXISTING ---
     if data.patient_id:
         found = False
         for i, p in enumerate(patients_list):
@@ -139,22 +145,19 @@ def save_or_update_patient(username: str, data: PatientUpdate):
                 break
         
         if not found:
-            raise HTTPException(status_code=404, detail="Patient ID match failed")
-            
+            raise HTTPException(status_code=404, detail="Patient ID not found")
         save_db(db)
         return {"success": True, "message": "Patient info updated."}
-
-    # --- CREATE NEW ---
     else:
+        new_id = f"P-{len(patients_list) + 1}"
         new_patient = data.model_dump()
-        new_patient["patient_id"] = f"P-{len(patients_list) + 1}"
+        new_patient["patient_id"] = new_id
         patients_list.append(new_patient)
         save_db(db)
-        return {"success": True, "message": "New patient profile added.", "patient_id": new_patient["patient_id"]}
+        return {"success": True, "message": "New patient created.", "patient_id": new_id}
 
 @app.delete("/patients/delete/{username}/{patient_id}")
 def delete_patient(username: str, patient_id: str):
-    """Deletes a specific patient profile from a caregiver's list."""
     db = load_db()
     if username not in db:
         raise HTTPException(status_code=404, detail="Caregiver not found")
@@ -163,7 +166,6 @@ def delete_patient(username: str, patient_id: str):
     db[username]["patients"] = [p for p in db[username]["patients"] if p["patient_id"] != patient_id]
 
     if len(db[username]["patients"]) == original_count:
-        raise HTTPException(status_code=404, detail="Patient ID not found")
-
+        raise HTTPException(status_code=404, detail="Patient not found")
     save_db(db)
     return {"success": True, "message": "Patient profile removed."}
