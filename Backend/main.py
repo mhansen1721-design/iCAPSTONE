@@ -48,7 +48,6 @@ class PatientUpdate(BaseModel):
 
 # --- 3. AUTHENTICATION & ACCOUNT MANAGEMENT ---
 
-# NEW: Username Availability Check
 @app.get("/register/check-username/{username}")
 def check_username(username: str):
     """Checks if a username is already taken during registration."""
@@ -94,14 +93,8 @@ def login(username: str, password: str):
         }
     return {"success": False, "message": "Invalid credentials"}
 
-# NEW: Logout Trigger
 @app.post("/logout")
 def logout(username: str):
-    """
-    Handles logging out. In a stateless JSON setup, this primarily 
-    serves as a signal for the frontend to clear local storage.
-    """
-    # You can add logic here to log session duration for Analytics Flow 3
     print(f"DEBUG: User {username} logged out.")
     return {"success": True, "message": "Session terminated."}
 
@@ -115,6 +108,25 @@ def delete_caregiver_account(username: str):
     return {"success": True, "message": "Account deleted successfully."}
 
 # --- 4. PATIENT MANAGEMENT ---
+
+#  Retrieve Patient Info by Full Name
+@app.get("/patients/retrieve")
+def get_patient_by_name(username: str, patient_full_name: str):
+    """
+    Finds a patient by name within a caregiver's list. 
+    Use this to pre-fill your edit form.
+    """
+    db = load_db()
+    user = db.get(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="Caregiver not found")
+
+    for patient in user.get("patients", []):
+        # Case-insensitive search for the patient name
+        if patient["name"].strip().lower() == patient_full_name.strip().lower():
+            return patient 
+            
+    raise HTTPException(status_code=404, detail="Patient name not found.")
 
 @app.get("/patients/{username}/{patient_id}")
 def get_patient_to_edit(username: str, patient_id: str):
