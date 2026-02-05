@@ -71,6 +71,11 @@ class ChatEndRequest(BaseModel):
     username: str
     patient_id: str
 
+# [NEW] Model for the password check request
+class ModeSwitchRequest(BaseModel):
+    username: str
+    password: str
+
 # --- 3. AUTHENTICATION ---
 @app.get("/register/check-username/{username}")
 def check_username(username: str):
@@ -98,6 +103,26 @@ def login(username: str, password: str):
     if user and user["password"] == password:
         return {"success": True, "caregiver_name": user.get("full_name"), "patients": user.get("patients", [])}
     return {"success": False, "message": "Invalid credentials"}
+
+# [NEW FEATURE] Secure Switch Back to Caregiver Mode
+@app.post("/caregiver/verify-mode-switch")
+def verify_mode_switch(data: ModeSwitchRequest):
+    """
+    Verifies the password before allowing the frontend to 
+    exit Patient Mode and return to Caregiver Mode.
+    """
+    db = load_json(DB_FILE)
+    user = db.get(data.username)
+
+    # 1. Check if user exists
+    if not user:
+         raise HTTPException(status_code=404, detail="User not found")
+
+    # 2. Check password
+    if user["password"] == data.password:
+        return {"success": True, "message": "Access granted. Switching to Caregiver Mode."}
+    else:
+        return {"success": False, "message": "Incorrect password. Cannot switch modes."}
 
 @app.post("/logout")
 def logout(username: str):
