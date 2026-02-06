@@ -1,0 +1,8 @@
+
+{
+  "name": "Nura Care",
+  "description": "A compassionate AI companion configurator for dementia care, helping caregivers personalize interactions based on patient needs and dementia stages.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
