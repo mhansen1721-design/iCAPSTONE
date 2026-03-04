@@ -1,39 +1,13 @@
 {
-    "caregiver_admin": {
-        "full_name": "Sarah Miller",
-        "email": "sarah@icap.com",
-        "password": "icap",
-        "patients": [
-            {
-                "patient_id": "P-1",
-                "name": "Arthur Miller",
-                "age": 82,
-                "stage": "Early",
-                "companion_figure": "Grandchild",
-                "memories": [
-                    "Was a high school architect",
-                    "Loves fishing at the lake"
-                ],
-                "triggers": [
-                    "Loud television",
-                    "Being asked to remember dates"
-                ],
-                "safe_topics": [
-                    "Jazz music",
-                    "Golden Retrievers"
-                ]
-            }
-        ]
-    },
-    "mhansen": {
-        "full_name": "Mya Hansen",
+    "gmail": {
+        "full_name": "string",
         "email": "gmail",
-        "password": "hansen",
+        "password": "H",
         "patients": [
             {
                 "patient_id": "P-1",
                 "name": "string",
-                "age": 90,
+                "age": 0,
                 "stage": "string",
                 "companion_figure": "string",
                 "memories": [
@@ -44,14 +18,16 @@
                 ],
                 "safe_topics": [
                     "string"
-                ]
+                ],
+                "appointments": [
+                    "string"
+                ],
+                "family_members": {
+                    "additionalProp1": "string",
+                    "additionalProp2": "string",
+                    "additionalProp3": "string"
+                }
             }
         ]
-    },
-    "Test2": {
-        "full_name": "string",
-        "email": "string",
-        "password": "test1",
-        "patients": []
     }
 }

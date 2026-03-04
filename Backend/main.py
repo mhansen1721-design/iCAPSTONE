@@ -5,8 +5,17 @@ import random
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # This allows for any url can change to be specifc
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 DB_FILE = "db_patients.json"
 CHAT_LOGS_FILE = "db_chat_logs.json"
 
@@ -30,7 +39,6 @@ def get_timestamp():
 # --- 2. DATA MODELS ---
 
 class UnifiedRegistration(BaseModel):
-    username: str
     password: str
     full_name: str
     email: str
@@ -57,49 +65,49 @@ class PatientUpdate(BaseModel):
     family_members: Dict[str, str]
 
 class ChatStartRequest(BaseModel):
-    username: str
+    email: str
     password: str
     patient_id: str
     duration_minutes: int
 
 class ChatMessage(BaseModel):
-    username: str
+    email: str
     patient_id: str
     message: str
 
 class ChatEndRequest(BaseModel):
-    username: str
+    email: str
     patient_id: str
 
 # [NEW] Model for the password check request
 class ModeSwitchRequest(BaseModel):
-    username: str
+    email: str
     password: str
 
 # --- 3. AUTHENTICATION ---
-@app.get("/register/check-username/{username}")
-def check_username(username: str):
+@app.get("/register/check-email/{email}")
+def check_email(email: str):
     db = load_json(DB_FILE)
-    return {"username": username, "available": username not in db}
+    return {"email": email, "available": email not in db}
 
 @app.post("/register")
 def register(data: UnifiedRegistration):
     db = load_json(DB_FILE)
-    if data.username in db: raise HTTPException(status_code=400, detail="Username exists")
+    if data.email in db: raise HTTPException(status_code=400, detail="Email already registered")
     first_patient = {
         "patient_id": "P-1", "name": data.patient_name, "age": data.patient_age,
         "stage": data.stage, "companion_figure": data.companion_figure,
         "memories": data.memories, "triggers": data.triggers, "safe_topics": data.safe_topics,
         "appointments": data.appointments, "family_members": data.family_members
     }
-    db[data.username] = {"full_name": data.full_name, "email": data.email, "password": data.password, "patients": [first_patient]}
+    db[data.email] = {"full_name": data.full_name, "email": data.email, "password": data.password, "patients": [first_patient]}
     save_json(DB_FILE, db)
     return {"success": True, "message": "Account created."}
 
 @app.post("/login")
-def login(username: str, password: str):
+def login(email: str, password: str):
     db = load_json(DB_FILE)
-    user = db.get(username)
+    user = db.get(email)
     if user and user["password"] == password:
         return {"success": True, "caregiver_name": user.get("full_name"), "patients": user.get("patients", [])}
     return {"success": False, "message": "Invalid credentials"}
@@ -112,7 +120,7 @@ def verify_mode_switch(data: ModeSwitchRequest):
     exit Patient Mode and return to Caregiver Mode.
     """
     db = load_json(DB_FILE)
-    user = db.get(data.username)
+    user = db.get(data.email)
 
     # 1. Check if user exists
     if not user:
@@ -125,56 +133,70 @@ def verify_mode_switch(data: ModeSwitchRequest):
         return {"success": False, "message": "Incorrect password. Cannot switch modes."}
 
 @app.post("/logout")
-def logout(username: str):
+def logout(email: str):
     return {"success": True, "message": "Session terminated."}
 
-@app.delete("/caregiver/delete/{username}")
-def delete_caregiver_account(username: str):
+@app.delete("/caregiver/delete/{email}")
+def delete_caregiver_account(email: str):
     db = load_json(DB_FILE)
-    if username in db: del db[username]; save_json(DB_FILE, db)
+    if email in db: del db[email]; save_json(DB_FILE, db)
     return {"success": True}
 
 # --- 4. PATIENT MANAGEMENT ---
 @app.get("/patients/retrieve")
-def get_patient_by_name(username: str, patient_full_name: str):
+def get_patient_by_name(email: str, patient_full_name: str):
     db = load_json(DB_FILE)
-    user = db.get(username)
+    user = db.get(email)
     if user:
         for p in user.get("patients", []):
             if p["name"].lower().strip() == patient_full_name.lower().strip(): return p
     raise HTTPException(status_code=404, detail="Not found")
 
-@app.get("/patients/{username}/{patient_id}")
-def get_patient_to_edit(username: str, patient_id: str):
+@app.get("/patients/{email}/{patient_id}")
+def get_patient_to_edit(email: str, patient_id: str):
     db = load_json(DB_FILE)
-    user = db.get(username)
+    user = db.get(email)
     if user:
         for p in user["patients"]:
             if p["patient_id"] == patient_id: return p
     raise HTTPException(status_code=404, detail="Not found")
 
-@app.post("/patients/save/{username}")
-def save_or_update_patient(username: str, data: PatientUpdate):
+@app.post("/patients/save/{email}")
+def save_or_update_patient(email: str, data: PatientUpdate):
     db = load_json(DB_FILE)
-    if username not in db: raise HTTPException(status_code=404)
-    patients = db[username]["patients"]
+    if email not in db: 
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    patients = db[email]["patients"]
+    
+    # --- THIS IS THE UPDATED PART ---
     if data.patient_id:
         for i, p in enumerate(patients):
             if p["patient_id"] == data.patient_id:
-                patients[i] = data.model_dump(); save_json(DB_FILE, db)
-                return {"success": True, "message": "Updated"}
-        raise HTTPException(status_code=404)
+                # We dump the new data, then manually re-attach the ID
+                updated_info = data.model_dump()
+                updated_info["patient_id"] = data.patient_id 
+                
+                patients[i] = updated_info
+                save_json(DB_FILE, db)
+                return {"success": True, "message": "Updated successfully"}
+        raise HTTPException(status_code=404, detail="Patient ID not found")
+    # --------------------------------
+    
     else:
-        new_id = f"P-{len(patients)+1}"
-        new_p = data.model_dump(); new_p["patient_id"] = new_id
-        patients.append(new_p); save_json(DB_FILE, db)
+        # Logical fix for ID generation: using a timestamp ensures no duplicates
+        new_id = f"P-{int(datetime.datetime.now().timestamp())}"
+        new_p = data.model_dump()
+        new_p["patient_id"] = new_id
+        patients.append(new_p)
+        save_json(DB_FILE, db)
         return {"success": True, "patient_id": new_id}
 
-@app.delete("/patients/delete/{username}/{patient_id}")
-def delete_patient(username: str, patient_id: str):
+@app.delete("/patients/delete/{email}/{patient_id}")
+def delete_patient(email: str, patient_id: str):
     db = load_json(DB_FILE)
-    if username in db:
-        db[username]["patients"] = [p for p in db[username]["patients"] if p["patient_id"] != patient_id]
+    if email in db:
+        db[email]["patients"] = [p for p in db[email]["patients"] if p["patient_id"] != patient_id]
         save_json(DB_FILE, db); return {"success": True}
     raise HTTPException(status_code=404)
 
@@ -218,7 +240,7 @@ def get_safe_previous_session(patient_id: str):
 @app.post("/chat/start")
 def start_session(data: ChatStartRequest):
     db = load_json(DB_FILE)
-    user = db.get(data.username)
+    user = db.get(data.email)
     if not user or user["password"] != data.password: raise HTTPException(status_code=401, detail="Invalid Password")
     patient = next((p for p in user["patients"] if p["patient_id"] == data.patient_id), None)
     if not patient: raise HTTPException(status_code=404, detail="Patient not found")
@@ -235,7 +257,7 @@ def start_session(data: ChatStartRequest):
 @app.post("/chat/message")
 def chat_message(data: ChatMessage):
     db = load_json(DB_FILE)
-    user = db.get(data.username)
+    user = db.get(data.email)
     if not user: raise HTTPException(status_code=404)
     patient = next((p for p in user["patients"] if p["patient_id"] == data.patient_id), None)
     
@@ -320,9 +342,9 @@ def get_chat_history(patient_id: str):
     return {"history": logs.get(patient_id, [])}
 
 @app.get("/chat/presets")
-def get_presets(username: str, patient_id: str, type: str):
+def get_presets(email: str, patient_id: str, type: str):
     db = load_json(DB_FILE)
-    user = db.get(username)
+    user = db.get(email)
     patient = next((p for p in user["patients"] if p["patient_id"] == patient_id), None)
     if type == "today":
         appt = ", ".join(patient.get("appointments", [])) or "No appointments."
