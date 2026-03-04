@@ -8,9 +8,11 @@ from typing import List, Optional, Dict
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Enabling CORS for your React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # This allows for any url can change to be specifc
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,37 +40,25 @@ def get_timestamp():
 
 # --- 2. DATA MODELS ---
 
-class UnifiedRegistration(BaseModel):
-    password: str
+class UserRegistration(BaseModel):
     full_name: str
     email: str
-    patient_name: str
-    patient_age: int
-    stage: str
-    companion_figure: str
-    memories: List[str]
-    triggers: List[str]
-    safe_topics: List[str]
-    appointments: List[str] 
-    family_members: Dict[str, str]
-
-class PatientUpdate(BaseModel):
-    patient_id: Optional[str] = None 
-    name: str
-    age: int
-    stage: str
-    companion_figure: str
-    memories: List[str]
-    triggers: List[str]
-    safe_topics: List[str]
-    appointments: List[str]
-    family_members: Dict[str, str]
-
-class ChatStartRequest(BaseModel):
-    email: str
     password: str
-    patient_id: str
-    duration_minutes: int
+
+class KeyPerson(BaseModel):
+    name: str
+    relation: str
+
+class PatientProfile(BaseModel):
+    id: Optional[str] = None
+    full_name: str
+    age: int
+    dementia_stage: str # mild, moderate, severe
+    patient_story: str
+    hobbies_and_career: str
+    key_people: List[KeyPerson]
+    approved_topics: List[str]
+    known_triggers: List[str]
 
 class ChatMessage(BaseModel):
     email: str
@@ -79,284 +69,146 @@ class ChatEndRequest(BaseModel):
     email: str
     patient_id: str
 
-# [NEW] Model for the password check request
-class ModeSwitchRequest(BaseModel):
-    email: str
-    password: str
-
-# --- 3. AUTHENTICATION ---
-@app.get("/register/check-email/{email}")
-def check_email(email: str):
-    db = load_json(DB_FILE)
-    return {"email": email, "available": email not in db}
+# --- 3. AUTHENTICATION & REGISTRATION ---
 
 @app.post("/register")
-def register(data: UnifiedRegistration):
+def register(data: UserRegistration):
     db = load_json(DB_FILE)
-    if data.email in db: raise HTTPException(status_code=400, detail="Email already registered")
-    first_patient = {
-        "patient_id": "P-1", "name": data.patient_name, "age": data.patient_age,
-        "stage": data.stage, "companion_figure": data.companion_figure,
-        "memories": data.memories, "triggers": data.triggers, "safe_topics": data.safe_topics,
-        "appointments": data.appointments, "family_members": data.family_members
+    email_key = data.email.lower().strip() # Normalize to prevent lookup errors
+    
+    if email_key in db:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Initialize the caregiver and the empty patients list
+    db[email_key] = {
+        "full_name": data.full_name,
+        "email": email_key,
+        "password": data.password,
+        "patients": [] 
     }
-    db[data.email] = {"full_name": data.full_name, "email": data.email, "password": data.password, "patients": [first_patient]}
     save_json(DB_FILE, db)
-    return {"success": True, "message": "Account created."}
+    return {"success": True, "message": "Account created successfully."}
 
 @app.post("/login")
 def login(email: str, password: str):
     db = load_json(DB_FILE)
-    user = db.get(email)
+    email_key = email.lower().strip()
+    user = db.get(email_key)
+    
     if user and user["password"] == password:
-        return {"success": True, "caregiver_name": user.get("full_name"), "patients": user.get("patients", [])}
+        return {
+            "success": True, 
+            "caregiver_name": user.get("full_name"), 
+            "patients": user.get("patients", [])
+        }
     return {"success": False, "message": "Invalid credentials"}
 
-# [NEW FEATURE] Secure Switch Back to Caregiver Mode
-@app.post("/caregiver/verify-mode-switch")
-def verify_mode_switch(data: ModeSwitchRequest):
-    """
-    Verifies the password before allowing the frontend to 
-    exit Patient Mode and return to Caregiver Mode.
-    """
-    db = load_json(DB_FILE)
-    user = db.get(data.email)
+# --- 4. PROFILE MANAGEMENT ---
 
-    # 1. Check if user exists
+@app.get("/caregiver/init-profile/{email}")
+def init_companion_profile(email: str):
+    """Retrieves existing info for editing or returns empty for new creation"""
+    db = load_json(DB_FILE)
+    email_key = email.lower().strip()
+    user = db.get(email_key)
+    
     if not user:
-         raise HTTPException(status_code=404, detail="User not found")
-
-    # 2. Check password
-    if user["password"] == data.password:
-        return {"success": True, "message": "Access granted. Switching to Caregiver Mode."}
-    else:
-        return {"success": False, "message": "Incorrect password. Cannot switch modes."}
-
-@app.post("/logout")
-def logout(email: str):
-    return {"success": True, "message": "Session terminated."}
-
-@app.delete("/caregiver/delete/{email}")
-def delete_caregiver_account(email: str):
-    db = load_json(DB_FILE)
-    if email in db: del db[email]; save_json(DB_FILE, db)
-    return {"success": True}
-
-# --- 4. PATIENT MANAGEMENT ---
-@app.get("/patients/retrieve")
-def get_patient_by_name(email: str, patient_full_name: str):
-    db = load_json(DB_FILE)
-    user = db.get(email)
-    if user:
-        for p in user.get("patients", []):
-            if p["name"].lower().strip() == patient_full_name.lower().strip(): return p
-    raise HTTPException(status_code=404, detail="Not found")
-
-@app.get("/patients/{email}/{patient_id}")
-def get_patient_to_edit(email: str, patient_id: str):
-    db = load_json(DB_FILE)
-    user = db.get(email)
-    if user:
-        for p in user["patients"]:
-            if p["patient_id"] == patient_id: return p
-    raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=404, detail="Caregiver not found. Register first.")
+    
+    patients = user.get("patients", [])
+    if len(patients) > 0:
+        return {"exists": True, "patient": patients[0]}
+    
+    return {"exists": False, "message": "No profile found."}
 
 @app.post("/patients/save/{email}")
-def save_or_update_patient(email: str, data: PatientUpdate):
+def save_or_update_patient(email: str, data: PatientProfile):
+    """Stores info under the caregiver's record in the JSON file"""
     db = load_json(DB_FILE)
-    if email not in db: 
+    email_key = email.lower().strip()
+    
+    if email_key not in db: 
         raise HTTPException(status_code=404, detail="User not found")
     
-    patients = db[email]["patients"]
+    patient_dict = data.model_dump()
+    incoming_id = patient_dict.pop("id", None)
+    # Generate ID if this is the first time saving
+    final_id = incoming_id or f"P-{int(datetime.datetime.now().timestamp())}"
+    patient_dict["patient_id"] = final_id
     
-    # --- THIS IS THE UPDATED PART ---
-    if data.patient_id:
-        for i, p in enumerate(patients):
-            if p["patient_id"] == data.patient_id:
-                # We dump the new data, then manually re-attach the ID
-                updated_info = data.model_dump()
-                updated_info["patient_id"] = data.patient_id 
-                
-                patients[i] = updated_info
-                save_json(DB_FILE, db)
-                return {"success": True, "message": "Updated successfully"}
-        raise HTTPException(status_code=404, detail="Patient ID not found")
-    # --------------------------------
+    patients = db[email_key].get("patients", [])
+    updated = False
     
-    else:
-        # Logical fix for ID generation: using a timestamp ensures no duplicates
-        new_id = f"P-{int(datetime.datetime.now().timestamp())}"
-        new_p = data.model_dump()
-        new_p["patient_id"] = new_id
-        patients.append(new_p)
-        save_json(DB_FILE, db)
-        return {"success": True, "patient_id": new_id}
+    # Update logic for existing patient IDs
+    for i, p in enumerate(patients):
+        if p.get("patient_id") == final_id:
+            patients[i] = patient_dict
+            updated = True
+            break
+            
+    if not updated:
+        patients.append(patient_dict)
+    
+    db[email_key]["patients"] = patients
+    save_json(DB_FILE, db)
+    return {"success": True, "message": "Profile saved", "patient_id": final_id}
 
 @app.delete("/patients/delete/{email}/{patient_id}")
-def delete_patient(email: str, patient_id: str):
+def delete_patient_profile(email: str, patient_id: str):
+    """Permanently removes a patient profile from the caregiver's record"""
     db = load_json(DB_FILE)
-    if email in db:
-        db[email]["patients"] = [p for p in db[email]["patients"] if p["patient_id"] != patient_id]
-        save_json(DB_FILE, db); return {"success": True}
-    raise HTTPException(status_code=404)
+    email_key = email.lower().strip()
+    
+    if email_key not in db:
+        raise HTTPException(status_code=404, detail="Caregiver account not found.")
+    
+    original_count = len(db[email_key].get("patients", []))
+    # Filter out the patient ID
+    db[email_key]["patients"] = [
+        p for p in db[email_key].get("patients", []) 
+        if p.get("patient_id") != patient_id
+    ]
+    
+    if len(db[email_key]["patients"]) == original_count:
+        raise HTTPException(status_code=404, detail="Patient profile not found.")
+    
+    save_json(DB_FILE, db)
+    return {"success": True, "message": "Profile permanently deleted."}
 
-# --- 5. AI CHATBOT LOGIC ---
+# --- 5. CHAT LOGIC ---
 
 def analyze_distress(text: str, patient_triggers: List[str]):
     text_lower = text.lower()
+    # Tier 3 critical distress check
     if any(k in text_lower for k in ["kill myself", "want to die", "hurt myself", "emergency", "help me"]):
         return 3, "CRITICAL DISTRESS", "BREAK_GLASS"
+    # Tier 3 wandering and medication safety check
+    if any(k in text_lower for k in ["wandering", "leaving", "stranger", "medication"]):
+        return 3, "Wandering/Medication Hazard", "ALERT_CAREGIVER"
     if any(k in text_lower for k in ["scared", "afraid", "lonely", "crying", "sad", "angry"]):
         return 2, "Emotional Distress", "GROUNDING"
-    if any(k in text_lower for k in ["who are you", "where am i", "home"]) or any(t.lower() in text_lower for t in patient_triggers):
-        return 1, "Confusion", "REDIRECT"
     return 0, "Normal", "NONE"
-
-def get_safe_previous_session(patient_id: str):
-    logs = load_json(CHAT_LOGS_FILE)
-    if patient_id not in logs: return None, "No history found."
-    user_logs = logs[patient_id]
-    if not user_logs: return None, "No history found."
-
-    session_messages = []
-    found_end_marker = False
-    
-    for entry in reversed(user_logs):
-        text = entry.get("text", "")
-        if "SESSION ENDED" in text:
-            if not found_end_marker: found_end_marker = True; continue
-            else: break
-        if found_end_marker: session_messages.append(entry)
-
-    if not session_messages: return None, "No recent completed session found."
-
-    for msg in session_messages:
-        if msg.get("distress_tier", 0) >= 2: return False, "High distress detected."
-
-    user_msgs = [m["text"] for m in session_messages if m["sender"] == "patient"]
-    summary = user_msgs[0] if user_msgs else "general things"
-    return True, summary
-
-@app.post("/chat/start")
-def start_session(data: ChatStartRequest):
-    db = load_json(DB_FILE)
-    user = db.get(data.email)
-    if not user or user["password"] != data.password: raise HTTPException(status_code=401, detail="Invalid Password")
-    patient = next((p for p in user["patients"] if p["patient_id"] == data.patient_id), None)
-    if not patient: raise HTTPException(status_code=404, detail="Patient not found")
-    
-    logs = load_json(CHAT_LOGS_FILE)
-    if data.patient_id not in logs: logs[data.patient_id] = []
-    logs[data.patient_id].append({"timestamp": get_timestamp(), "sender": "system", "text": "SESSION STARTED"})
-    save_json(CHAT_LOGS_FILE, logs)
-
-    start_time = datetime.datetime.now()
-    end_time = start_time + datetime.timedelta(minutes=data.duration_minutes)
-    return {"success": True, "session_details": {"patient_name": patient["name"], "end_time": end_time.strftime("%H:%M")}}
 
 @app.post("/chat/message")
 def chat_message(data: ChatMessage):
     db = load_json(DB_FILE)
-    user = db.get(data.email)
-    if not user: raise HTTPException(status_code=404)
-    patient = next((p for p in user["patients"] if p["patient_id"] == data.patient_id), None)
+    email_key = data.email.lower().strip()
+    user = db.get(email_key)
+    patient = next((p for p in user["patients"] if p.get("patient_id") == data.patient_id), None)
     
-    # 1. SPECIAL RECALL LOGIC
-    recall_keywords = ["yesterday", "last time", "talk about before", "previous session"]
-    if any(k in data.message.lower() for k in recall_keywords):
-        is_safe, summary = get_safe_previous_session(data.patient_id)
-        if is_safe is False:
-            response_text = "I'm having a little trouble remembering that clearly right now. But I'd love to hear about what you're doing today!"
-        elif is_safe is True:
-            response_text = f"Last time, you mentioned: \"{summary}\". It was nice talking to you about that."
-        else:
-            response_text = "We haven't chatted in a while, but I'm happy to be here with you now."
-            
-        logs = load_json(CHAT_LOGS_FILE)
-        logs[data.patient_id].append({"timestamp": get_timestamp(), "sender": "patient", "text": data.message, "distress_tier": 0})
-        logs[data.patient_id].append({"timestamp": get_timestamp(), "sender": "ai", "text": response_text})
-        save_json(CHAT_LOGS_FILE, logs)
-        return {"response": response_text, "tier": 0, "ui_signal": "NONE"}
+    tier, log_msg, action = analyze_distress(data.message, patient.get("known_triggers", []))
+    response_text = f"That is interesting. Tell me more about {data.message}."
+    
+    # Relation recognition logic
+    for person in patient.get("key_people", []):
+        if person["name"].lower() in data.message.lower():
+            response_text = f"Yes, {person['name']} is your {person['relation']}."
+            break
 
-    # 2. STANDARD FLOW
-    tier, log_msg, action = analyze_distress(data.message, patient.get("triggers", []))
-    response_text = ""
-    ui_signal = "NONE"
-
-    if tier == 3:
-        response_text = "I am alerting your caregiver immediately. Please stay here with me."
-        ui_signal = "BREAK_GLASS_ALERT"
-    elif tier == 2:
-        response_text = f"I hear that you are feeling {log_msg.lower()}. Can you tell me what made you feel this way?"
-        ui_signal = "CALM_MODE"
-    elif tier == 1:
-        safe_topic = random.choice(patient.get("safe_topics", ["weather"]))
-        response_text = f"It's okay. Let's talk about {safe_topic}."
-    else:
-        # TIER 0: NORMAL + FULL SESSION MEMORY
-        logs = load_json(CHAT_LOGS_FILE)
-        current_session_messages = [] # Will hold all messages from THIS session
-        
-        if data.patient_id in logs:
-            # Iterate REVERSE to find start marker
-            for msg in reversed(logs[data.patient_id]):
-                if "SESSION STARTED" in msg["text"]: 
-                    break # Stop when we hit the start of this session
-                
-                # Collect user messages only
-                if msg["sender"] == "patient": 
-                    current_session_messages.append(msg["text"])
-            
-            # Since we collected in reverse, flip list to be Chronological (Oldest -> Newest)
-            current_session_messages.reverse()
-
-        # Family Check
-        found_family = False
-        for name, relation in patient.get("family_members", {}).items():
-            if name.lower() in data.message.lower():
-                response_text = f"Yes, {name} is your {relation}."
-                found_family = True
-                break
-        
-        if not found_family:
-            if current_session_messages:
-                # Mock AI response referencing older messages in session
-                # Example: "You mentioned [Topic from 10 mins ago] earlier..."
-                start_topic = current_session_messages[0] 
-                response_text = f"That is interesting. Earlier you mentioned {start_topic}, and now {data.message}. Tell me more."
-            else:
-                response_text = f"That is interesting about {data.message}. Tell me more."
-
-    # 3. LOG HISTORY
     logs = load_json(CHAT_LOGS_FILE)
     if data.patient_id not in logs: logs[data.patient_id] = []
     logs[data.patient_id].append({"timestamp": get_timestamp(), "sender": "patient", "text": data.message, "distress_tier": tier})
     logs[data.patient_id].append({"timestamp": get_timestamp(), "sender": "ai", "text": response_text})
     save_json(CHAT_LOGS_FILE, logs)
 
-    return {"response": response_text, "tier": tier, "ui_signal": ui_signal}
-
-@app.get("/chat/history/{patient_id}")
-def get_chat_history(patient_id: str):
-    logs = load_json(CHAT_LOGS_FILE)
-    return {"history": logs.get(patient_id, [])}
-
-@app.get("/chat/presets")
-def get_presets(email: str, patient_id: str, type: str):
-    db = load_json(DB_FILE)
-    user = db.get(email)
-    patient = next((p for p in user["patients"] if p["patient_id"] == patient_id), None)
-    if type == "today":
-        appt = ", ".join(patient.get("appointments", [])) or "No appointments."
-        return {"title": "Today", "content": f"Today is {datetime.datetime.now().strftime('%A')}. {appt}"}
-    elif type == "memory":
-        return {"title": "Memory", "content": random.choice(patient.get("memories", ["Tell me a story."]))}
-    return {"error": "Invalid"}
-
-@app.post("/chat/end")
-def end_chat(data: ChatEndRequest):
-    logs = load_json(CHAT_LOGS_FILE)
-    if data.patient_id not in logs: logs[data.patient_id] = []
-    logs[data.patient_id].append({"timestamp": get_timestamp(), "sender": "system", "text": "SESSION ENDED"})
-    save_json(CHAT_LOGS_FILE, logs)
-    return {"success": True}
+    return {"response": response_text, "tier": tier, "ui_signal": action}

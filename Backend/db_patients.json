@@ -1,33 +1,33 @@
-{
-    "gmail": {
-        "full_name": "string",
-        "email": "gmail",
-        "password": "H",
-        "patients": [
-            {
-                "patient_id": "P-1",
-                "name": "string",
-                "age": 0,
-                "stage": "string",
-                "companion_figure": "string",
-                "memories": [
-                    "string"
-                ],
-                "triggers": [
-                    "string"
-                ],
-                "safe_topics": [
-                    "string"
-                ],
-                "appointments": [
-                    "string"
-                ],
-                "family_members": {
-                    "additionalProp1": "string",
-                    "additionalProp2": "string",
-                    "additionalProp3": "string"
-                }
-            }
-        ]
+ {
+
+    "L": {
+        "full_name": "T",
+        "email": "L",
+        "password": "W",
+        "patients": []
+    },
+    "Hansen": {
+        "full_name": "Mya",
+        "email": "Hansen",
+        "password": "T",
+        "patients": []
+    },
+    "test": {
+        "full_name": "test",
+        "email": "test",
+        "password": "test",
+        "patients": []
+    },
+    "Test2": {
+        "full_name": "Test",
+        "email": "Test2",
+        "password": "3",
+        "patients": []
+    },
+    "t3": {
+        "full_name": "t",
+        "email": "t3",
+        "password": "2",
+        "patients": []
     }
 }
