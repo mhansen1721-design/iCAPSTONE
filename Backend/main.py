@@ -3,12 +3,13 @@ import os
 import datetime
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
 # Enabling CORS for React frontend connectivity
+# Using "*" for development; update to specific origins for production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -47,24 +48,19 @@ class UserRegistration(BaseModel):
     password: str
 
 class KeyPerson(BaseModel):
-    name: str
-    relation: str
+    name: str = ""
+    relation: str = ""
 
 class PatientProfile(BaseModel):
     patient_id: Optional[str] = None
-    full_name: str
-    age: int = Field(gt=0)
-    dementia_stage: str
-    patient_story: str
-    hobbies_and_career: str
-    key_people: List[KeyPerson]
-    approved_topics: List[str]
-    known_triggers: List[str]
-
-class ChatMessage(BaseModel):
-    email: str
-    patient_id: str
-    message: str
+    full_name: str = "Unnamed"
+    age: Optional[int] = 0
+    dementia_stage: str = "Early"
+    patient_story: Optional[str] = ""
+    hobbies_and_career: Optional[str] = ""
+    key_people: List[KeyPerson] = []
+    approved_topics: List[str] = []
+    known_triggers: List[str] = []
 
 class MessageModel(BaseModel):
     sender: str
@@ -108,10 +104,8 @@ def login(email: str, password: str):
     return {"success": False, "message": "Invalid credentials"}
 
 # --- 4. PROFILE MANAGEMENT ---
-
 @app.get("/caregiver/init-profile/{email}")
 def init_companion_profile(email: str):
-    """Fetches the caregiver's patient list for the dashboard."""
     db = load_json(DB_FILE)
     email_key = email.lower().strip()
     user = db.get(email_key)
@@ -123,7 +117,6 @@ def init_companion_profile(email: str):
 
 @app.post("/patients/save/{email}")
 def save_or_update_patient(email: str, data: PatientProfile):
-    """Saves a new patient or updates an existing one."""
     db = load_json(DB_FILE)
     email_key = email.lower().strip()
     if email_key not in db: 
@@ -150,10 +143,8 @@ def save_or_update_patient(email: str, data: PatientProfile):
 
 @app.delete("/patients/delete/{email}/{patient_id}")
 def delete_patient_profile(email: str, patient_id: str):
-    """Permanently removes a patient profile from the JSON database."""
     db = load_json(DB_FILE)
     email_key = email.lower().strip()
-    
     if email_key not in db:
         raise HTTPException(status_code=404, detail="Caregiver not found.")
     
@@ -161,28 +152,13 @@ def delete_patient_profile(email: str, patient_id: str):
     filtered_patients = [p for p in patients if p.get("patient_id") != patient_id]
     
     if len(filtered_patients) == len(patients):
-         raise HTTPException(status_code=404, detail="Patient ID not found in JSON.")
+         raise HTTPException(status_code=404, detail="Patient ID not found.")
 
     db[email_key]["patients"] = filtered_patients
     save_json(DB_FILE, db)
-    return {"success": True, "message": "Profile permanently deleted."}
+    return {"success": True}
 
-# --- 5. CHAT & DISTRESS LOGIC ---
-
-def analyze_distress(text: str):
-    """Analyzes text for practical hazards like wandering, medication, or strangers."""
-    text_lower = text.lower()
-    tier_3 = ["wandering", "leaving the house", "go outside", "pill", "medication", "stranger"]
-    if any(k in text_lower for k in tier_3):
-        return 3, "Hazard Alert", "ALERT_CAREGIVER"
-    return 0, "Normal", "NONE"
-
-@app.post("/chat/message")
-def chat_message(data: ChatMessage):
-    """Processes live chat messages (currently handles echo logic)."""
-    tier, log_msg, action = analyze_distress(data.message)
-    return {"response": data.message, "tier": tier, "ui_signal": action}
-
+# --- 5. SESSION LOGGING ---
 @app.post("/chat/save-session")
 def save_session(data: SessionSave):
     db = load_json(DB_FILE)
@@ -193,7 +169,6 @@ def save_session(data: SessionSave):
         raise HTTPException(status_code=401, detail="Verification failed")
 
     logs = load_json(CHAT_LOGS_FILE)
-    
     if email_key not in logs:
         logs[email_key] = {}
     
@@ -207,38 +182,30 @@ def save_session(data: SessionSave):
             "sessions": []
         }
   
-    # Convert each MessageModel into a standard dictionary so JSON can handle it
     serializable_messages = [msg.model_dump() for msg in data.messages]
-    
     logs[email_key][pass_key][data.patient_id]["sessions"].append({
         "timestamp": get_timestamp(),
-        "transcript": serializable_messages # Save the dictionaries, not the models
+        "transcript": serializable_messages 
     })
     
     save_json(CHAT_LOGS_FILE, logs)
     return {"success": True}
 
-@app.post("/caregiver/delete-account") # Using POST so we can send credentials in the body
+@app.post("/caregiver/delete-account")
 def delete_caregiver_account(data: dict):
     email = data.get("email", "").lower().strip()
     password = data.get("password", "")
-    
     db = load_json(DB_FILE)
     
-    # 1. Verification
     if email not in db or db[email]["password"] != password:
-        raise HTTPException(status_code=401, detail="Invalid email or password. Deletion denied.")
+        raise HTTPException(status_code=401, detail="Invalid credentials.")
     
-    # 2. Delete from Patients DB
     del db[email]
     save_json(DB_FILE, db)
     
-    # 3. Delete from Chat Logs
     logs = load_json(CHAT_LOGS_FILE)
     if email in logs:
         del logs[email]
         save_json(CHAT_LOGS_FILE, logs)
         
     return {"success": True}
-
-
