@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PatientProfile } from '../types';
-import { ChevronLeft, Mic, Send, LogOut } from 'lucide-react';
+import { ChevronLeft, Mic, Send, LogOut, XCircle } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 
 interface Message {
@@ -31,15 +31,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [textInput, setTextInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSessionOver, setIsSessionOver] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false); // NEW: Popup state
   const [secondsLeft, setSecondsLeft] = useState(durationMinutes * 60);
   
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Ref to track the latest messages for the save-session API call
   const messagesRef = useRef<Message[]>([]);
 
   const getTimestamp = () => new Date().toLocaleString();
 
-  // Keep messagesRef in sync with the state
   useEffect(() => {
     messagesRef.current = messages;
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,6 +46,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const handleFinalExit = async () => {
     setIsSessionOver(true); 
+    setShowExitConfirm(false); // Close popup if open
     
     try {
       await fetch("http://127.0.0.1:8000/chat/save-session", {
@@ -56,15 +56,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
           email: caregiverEmail,
           password: caregiverPassword,
           patient_id: patient.patient_id || patient.id,
-          patient_name: patient.full_name || patient.name,
-          messages: messagesRef.current // Uses Ref to get current transcript
+          full_name: patient.full_name || patient.name, 
+          messages: messagesRef.current 
         }),
       });
     } catch (err) {
       console.error("Failed to save session logs:", err);
     }
 
-    // Auto log out after 3 seconds
     setTimeout(() => {
       onLogout();
     }, 3000);
@@ -72,8 +71,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
-    // Timer starts immediately on mount
     if (secondsLeft > 0 && !isSessionOver) {
       interval = setInterval(() => {
         setSecondsLeft((prev) => {
@@ -86,34 +83,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
         });
       }, 1000);
     }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return () => { if (interval) clearInterval(interval); };
   }, [secondsLeft, isSessionOver]);
-
 
   const handleSendMessage = () => {
     if (!textInput.trim() || isSessionOver) return;
-
     const userText = textInput;
-    const userMsg: Message = {
-      sender: 'patient',
-      text: userText,
-      timestamp: getTimestamp()
-    };
-
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, { sender: 'patient', text: userText, timestamp: getTimestamp() }]);
     setTextInput('');
     setIsPlaying(true);
-
     setTimeout(() => {
-      const aiMsg: Message = {
-        sender: 'ai',
-        text: userText, // Echo logic
-        timestamp: getTimestamp()
-      };
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => [...prev, { sender: 'ai', text: userText, timestamp: getTimestamp() }]);
       setIsPlaying(false);
     }, 1000);
   };
@@ -121,7 +101,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <div className="w-full h-screen flex flex-col relative overflow-hidden bg-[#0b0a1a]">
       
-      {/* Session Over Overlay */}
+      {/* 1. Confirmation Modal Popup */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-[#171140] border border-white/10 p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl animate-in zoom-in duration-300">
+            <XCircle size={48} className="text-red-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">End Session?</h2>
+            <p className="text-indigo-200/60 mb-8">Are you sure you want to end the session?</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 py-3 rounded-xl bg-white/5 text-white font-semibold hover:bg-white/10 transition-all"
+              >
+                No, Stay
+              </button>
+              <button 
+                onClick={handleFinalExit}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+              >
+                Yes, End
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Session Over Overlay */}
       {isSessionOver && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center animate-in fade-in duration-500">
           <div className="text-center space-y-6">
@@ -129,20 +134,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
                <LogOut size={40} className="text-red-400" />
             </div>
             <h1 className="text-6xl font-black text-white tracking-tighter">Session Ended</h1>
-            <p className="text-indigo-200 text-xl opacity-60">Saving conversation and logging out...</p>
+            <p className="text-indigo-200 text-xl opacity-60">logging out...</p>
           </div>
         </div>
       )}
 
-      {/* Header */}
-      <header className="p-6 z-50 flex items-center gap-4 bg-[#171140]/50 backdrop-blur-md border-b border-white/5">
-        <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full text-white transition-all">
-          <ChevronLeft size={24} />
-        </button>
-        <div className="flex items-center gap-3">
-          <Avatar size="sm" type={patient.avatarType} emotion={isPlaying ? 'happy' : 'neutral'} />
-          <h2 className="text-white font-semibold">{patient.full_name || patient.name}</h2>
+      {/* 3. Header with End Button */}
+      <header className="p-6 z-50 flex items-center justify-between bg-[#171140]/50 backdrop-blur-md border-b border-white/5">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full text-white transition-all">
+            <ChevronLeft size={24} />
+          </button>
+          <div className="flex items-center gap-3">
+            <Avatar size="sm" type={patient.avatarType} emotion={isPlaying ? 'happy' : 'neutral'} />
+            <h2 className="text-white font-semibold">{patient.full_name || patient.name}</h2>
+          </div>
         </div>
+
+        {/* Manual End Session Button */}
+        <button 
+          onClick={() => setShowExitConfirm(true)}
+          className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
+        >
+          <LogOut size={16} />
+          End Session
+        </button>
       </header>
 
       {/* Chat History Area */}

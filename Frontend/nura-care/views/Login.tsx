@@ -3,7 +3,8 @@ import { Avatar } from '../components/Avatar';
 import { RegisterModal } from '../views/Register'; 
 
 interface LoginProps {
-  onLogin: (email: string) => void;
+  // FIXED: Now expects both email and password
+  onLogin: (email: string, password: string) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -14,7 +15,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 
   const handleManualLogin = async (e?: React.FormEvent) => {
-    // Prevent default form behavior if called from a form submit
     if (e) e.preventDefault();
     
     if (!email.trim() || !password.trim()) {
@@ -35,8 +35,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       const data = await response.json();
 
       if (response.ok && data.success === true) {
-        // Normalize email before passing to parent App.tsx
-        onLogin(email.toLowerCase().trim());
+        // FIXED: Passing both credentials to the parent App
+        onLogin(email.toLowerCase().trim(), password); 
       } else {
         setError(data.message || "Invalid email or password");
       }
@@ -50,7 +50,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 animate-in fade-in zoom-in duration-1000">
-      {/* Ensure RegisterModal is imported correctly to prevent blank screen crashes */}
       <RegisterModal 
         isOpen={isRegisterOpen} 
         onClose={() => setIsRegisterOpen(false)} 

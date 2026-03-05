@@ -4,7 +4,6 @@ import { Login } from '../views/Login';
 import { Dashboard } from '../views/Dashboard';
 import { ConfigFlow } from '../views/ConfigFlow';
 import { ChatView } from '../views/ChatView';
-import { DementiaStage } from '../types';
 import type { PatientProfile, ViewState } from '../types';
 
 export default function App() {
@@ -14,19 +13,26 @@ export default function App() {
   const [activeChatPatientId, setActiveChatPatientId] = useState<string | null>(null);
   const [caregiverEmail, setCaregiverEmail] = useState<string>('');
   
-  // Captures password for the new db_chat_logs.json organization
+  // REQUIRED: To satisfy backend organization (Email > Password > Patient)
   const [caregiverPassword, setCaregiverPassword] = useState<string>('');
   const [chatDuration, setChatDuration] = useState<number>(15);
 
+  /**
+   * Captures credentials from the Login component. 
+   * Ensure your Login.tsx calls this with both arguments: onLogin(email, password)
+   */
   const handleLogin = (email: string, password?: string) => {
-    setCaregiverEmail(email);
-    // Store password if provided by Login component to use for session saving
-    if (password) setCaregiverPassword(password);
+    setCaregiverEmail(email.toLowerCase().trim());
+    if (password) {
+      setCaregiverPassword(password);
+    }
     setView('DASHBOARD');
   };
 
+  /**
+   * Resets all session data and returns to login
+   */
   const handleLogout = () => {
-    // Completely reset all local states for security
     setCaregiverEmail('');
     setCaregiverPassword('');
     setActiveChatPatientId(null);
@@ -45,7 +51,7 @@ export default function App() {
   };
 
   const handleDeletePatient = (id: string) => {
-    setPatients(prev => prev.filter(p => p.id !== id && p.patient_id !== id));
+    setPatients(prev => prev.filter(p => (p.patient_id || p.id) !== id));
   };
 
   const handleStartChatWithTimer = (id: string, minutes: number) => {
@@ -67,22 +73,30 @@ export default function App() {
     setView('DASHBOARD');
   };
 
-  const currentPatientToEdit = editingPatientId 
-    ? patients.find(p => p.id === editingPatientId || p.patient_id === editingPatientId) || null 
-    : null;
+  // Helper to find current active profiles
+  const currentPatientToEdit = React.useMemo(() => {
+  if (!editingPatientId) return null;
+  return patients.find(p => 
+    p.patient_id === editingPatientId || 
+    p.id === editingPatientId || 
+    String(p.patient_id) === String(editingPatientId)
+  ) || null;
+}, [editingPatientId, patients]);
     
   const currentChatPatient = activeChatPatientId
-    ? patients.find(p => p.id === activeChatPatientId || p.patient_id === activeChatPatientId) || null
+    ? patients.find(p => (p.patient_id || p.id) === activeChatPatientId) || null
     : null;
 
   return (
     <main className="min-h-screen text-slate-50 relative">
       <Background />
       
+      {/* 1. Login View */}
       {view === 'LOGIN' && (
         <Login onLogin={handleLogin} />
       )}
 
+      {/* 2. Dashboard View */}
       {view === 'DASHBOARD' && (
         <Dashboard 
           caregiverEmail={caregiverEmail} 
@@ -95,6 +109,7 @@ export default function App() {
         />
       )}
 
+      {/* 3. Patient Configuration Flow */}
       {view === 'CONFIG' && (
         <ConfigFlow 
           caregiverEmail={caregiverEmail} 
@@ -104,14 +119,15 @@ export default function App() {
         />
       )}
 
+      {/* 4. Live Chat View (Auto-saves on end) */}
       {view === 'CHAT' && currentChatPatient && (
         <ChatView
           patient={currentChatPatient}
           durationMinutes={chatDuration}
           caregiverEmail={caregiverEmail}
-          caregiverPassword={caregiverPassword} // Passed for log verification
+          caregiverPassword={caregiverPassword} 
           onBack={() => setView('DASHBOARD')}
-          onLogout={handleLogout} // Passed to trigger auto-logout after session
+          onLogout={handleLogout} 
         />
       )}
     </main>

@@ -66,13 +66,17 @@ class ChatMessage(BaseModel):
     patient_id: str
     message: str
 
+class MessageModel(BaseModel):
+    sender: str
+    text: str
+    timestamp: str
+
 class SessionSave(BaseModel):
-    """Model for the final session transcript save."""
     email: str
     password: str
     patient_id: str
-    patient_name: str
-    messages: List[Dict]
+    full_name: str
+    messages: List[MessageModel]
 
 # --- 3. AUTH & REGISTRATION ---
 @app.post("/register")
@@ -181,7 +185,6 @@ def chat_message(data: ChatMessage):
 
 @app.post("/chat/save-session")
 def save_session(data: SessionSave):
-    """Saves session transcripts organized by caregiver credentials."""
     db = load_json(DB_FILE)
     email_key = data.email.lower().strip()
     
@@ -200,14 +203,42 @@ def save_session(data: SessionSave):
         
     if data.patient_id not in logs[email_key][pass_key]:
         logs[email_key][pass_key][data.patient_id] = {
-            "patient_name": data.patient_name,
+            "full_name": data.full_name,
             "sessions": []
         }
-        
+  
+    # Convert each MessageModel into a standard dictionary so JSON can handle it
+    serializable_messages = [msg.model_dump() for msg in data.messages]
+    
     logs[email_key][pass_key][data.patient_id]["sessions"].append({
         "timestamp": get_timestamp(),
-        "transcript": data.messages
+        "transcript": serializable_messages # Save the dictionaries, not the models
     })
     
     save_json(CHAT_LOGS_FILE, logs)
     return {"success": True}
+
+@app.post("/caregiver/delete-account") # Using POST so we can send credentials in the body
+def delete_caregiver_account(data: dict):
+    email = data.get("email", "").lower().strip()
+    password = data.get("password", "")
+    
+    db = load_json(DB_FILE)
+    
+    # 1. Verification
+    if email not in db or db[email]["password"] != password:
+        raise HTTPException(status_code=401, detail="Invalid email or password. Deletion denied.")
+    
+    # 2. Delete from Patients DB
+    del db[email]
+    save_json(DB_FILE, db)
+    
+    # 3. Delete from Chat Logs
+    logs = load_json(CHAT_LOGS_FILE)
+    if email in logs:
+        del logs[email]
+        save_json(CHAT_LOGS_FILE, logs)
+        
+    return {"success": True}
+
+

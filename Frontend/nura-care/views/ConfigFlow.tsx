@@ -408,4 +408,3 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
    </div>
  );
 };
-
