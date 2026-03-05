@@ -6,6 +6,9 @@ export enum DementiaStage {
 
 export type AvatarType = 'jellyfish' | 'panda' | 'axolotl';
 
+// Added ViewState with 'CHAT' to fix the App.tsx squiggle
+export type ViewState = 'LOGIN' | 'DASHBOARD' | 'CONFIG' | 'CHAT';
+
 export interface FamilyMember {
   id: string;
   name: string;
@@ -16,10 +19,13 @@ export interface FamilyMember {
 
 export interface PatientProfile {
   id: string;
+  patient_id?: string; // Critical: Fixes the 'patient_id does not exist' error
   name: string;
+  full_name?: string;  // Added for backend compatibility
   avatarType: AvatarType;
   age: number;
   stage: DementiaStage;
+  dementia_stage?: string; // Added for backend compatibility
   description: string;
   
   // Personalization
@@ -38,5 +44,3 @@ export interface AISuggestionResponse {
   suggestedTriggers: string[];
   suggestedActivity: string;
 }
-
-export type ViewState = 'LOGIN' | 'DASHBOARD' | 'CONFIG';

@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { Avatar } from '../components/Avatar';
-
-// Import from views/Register as per your updated file structure
 import { RegisterModal } from '../views/Register'; 
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (email: string) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -13,24 +11,37 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // State to track if the Register popup is open
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 
-  const handleManualLogin = async () => {
+  const handleManualLogin = async (e?: React.FormEvent) => {
+    // Prevent default form behavior if called from a form submit
+    if (e) e.preventDefault();
+    
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter both email and password.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
+
     try {
-      const url = `http://127.0.0.1:8000/login?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
-      const response = await fetch(url, { method: "POST", headers: { "Accept": "application/json" } });
+      const url = `http://127.0.0.1:8000/login?email=${encodeURIComponent(email.trim())}&password=${encodeURIComponent(password)}`;
+      const response = await fetch(url, { 
+        method: "POST", 
+        headers: { "Accept": "application/json" } 
+      });
+      
       const data = await response.json();
 
       if (response.ok && data.success === true) {
-        onLogin();
+        // Normalize email before passing to parent App.tsx
+        onLogin(email.toLowerCase().trim());
       } else {
         setError(data.message || "Invalid email or password");
       }
     } catch (err) {
+      console.error("Login Error:", err);
       setError("Connection failed. Is the backend running?");
     } finally {
       setIsLoading(false);
@@ -39,8 +50,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 animate-in fade-in zoom-in duration-1000">
-      
-      {/* The Modal component from Register.tsx */}
+      {/* Ensure RegisterModal is imported correctly to prevent blank screen crashes */}
       <RegisterModal 
         isOpen={isRegisterOpen} 
         onClose={() => setIsRegisterOpen(false)} 
@@ -53,38 +63,45 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <h1 className="text-5xl font-extrabold mb-4 text-center tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-indigo-300">
         Nura Care
       </h1>
+      
       <p className="text-indigo-200 text-center mb-12 text-lg max-w-md">
         Compassionate AI companionship designed for peace of mind.
       </p>
 
-      <div className="glass-panel p-8 rounded-3xl w-full max-w-md flex flex-col gap-4 border-white/10 shadow-2xl">
-        {/* FIXED: We only show the login error if the register modal is CLOSED.
-          This prevents registration errors from showing up on the background login screen.
-        */}
+      <form 
+        onSubmit={handleManualLogin}
+        className="glass-panel p-8 rounded-3xl w-full max-w-md flex flex-col gap-4 border-white/10 shadow-2xl"
+      >
         {error && !isRegisterOpen && (
-          <p className="text-red-400 text-sm text-center font-medium">{error}</p>
+          <p className="text-red-400 text-sm text-center font-medium animate-in slide-in-from-top-2">
+            {error}
+          </p>
         )}
 
         <input 
           type="email" 
+          autoComplete="email"
           placeholder="Caregiver Email" 
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400 transition-colors"
+          required
         />
+        
         <input 
           type="password" 
+          autoComplete="current-password"
           placeholder="Password" 
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400 transition-colors"
+          required
         />
         
         <button 
-          type="button"
-          onClick={handleManualLogin}
+          type="submit"
           disabled={isLoading}
-          className="mt-2 bg-[#715ffa] hover:bg-[#8475ff] text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-500/15 transition-all active:scale-95 disabled:opacity-50"
+          className="mt-2 bg-[#715ffa] hover:bg-[#8475ff] text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
         >
           {isLoading ? "Connecting..." : "Sign In"}
         </button>
@@ -92,14 +109,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <button 
           type="button"
           onClick={() => {
-            setError(null); // Clear any old login errors when opening register
+            setError(null);
             setIsRegisterOpen(true);
           }}
           className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-4 rounded-xl transition-all active:scale-95"
         >
           Register
         </button>
-      </div>
+      </form>
     </div>
   );
 };

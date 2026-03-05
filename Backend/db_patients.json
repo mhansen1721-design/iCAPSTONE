@@ -1,33 +1,27 @@
- {
-
-    "L": {
-        "full_name": "T",
-        "email": "L",
-        "password": "W",
-        "patients": []
-    },
-    "Hansen": {
+{
+    "a@gmail.com": {
         "full_name": "Mya",
-        "email": "Hansen",
-        "password": "T",
-        "patients": []
-    },
-    "test": {
-        "full_name": "test",
-        "email": "test",
-        "password": "test",
-        "patients": []
-    },
-    "Test2": {
-        "full_name": "Test",
-        "email": "Test2",
-        "password": "3",
-        "patients": []
-    },
-    "t3": {
-        "full_name": "t",
-        "email": "t3",
+        "email": "a@gmail.com",
         "password": "2",
-        "patients": []
+        "patients": [
+            {
+                "patient_id": "P-1772673432",
+                "full_name": "2",
+                "age": 2,
+                "dementia_stage": "Middle Stage (Moderate)",
+                "patient_story": "2",
+                "hobbies_and_career": "",
+                "key_people": [
+                    {
+                        "name": "2",
+                        "relation": "2"
+                    }
+                ],
+                "approved_topics": [],
+                "known_triggers": [
+                    "2"
+                ]
+            }
+        ]
     }
 }
