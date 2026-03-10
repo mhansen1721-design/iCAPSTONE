@@ -5,7 +5,7 @@ from transformers import pipeline
 # Using "auto" device map will default to CPU if no GPU is found
 generator = pipeline(
     "text-generation", 
-    model="Qwen/Qwen2.5-1.5B-Instruct", 
+    model="Qwen/Qwen2.5-3B-Instruct", 
     device_map="auto"
 )
 
@@ -79,6 +79,88 @@ Input9= {
   "detected_tier": 2
 }
 
+Input10= {
+  "patient_id": "P001",
+  "user_input": "Why is it so dark in here? I'm worried.",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "The sun went down and now I'm nervous."}],
+  "detected_tier": 2
+}
+Input11= {
+  "patient_id": "P001",
+  "user_input": "Nobody cares about me anymore. I'm all alone.",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "assistant", "content": "How was your lunch?"}, {"role": "user", "content": "I ate by myself. Again."}],
+  "detected_tier": 2
+}
+Input12= {
+  "patient_id": "P001",
+  "user_input": "I'm so angry at this computer! Why won't it talk back right?",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "Stop asking me questions!"}],
+  "detected_tier": 2
+}
+Input13= {
+  "patient_id": "P001",
+  "user_input": "I feel like I'm losing my mind. It's miserable.",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "I can't remember my daughter's face today."}],
+  "detected_tier": 2
+}
+Input14= {
+  "patient_id": "P001",
+  "user_input": "I'm panicked. I think I'm supposed to be somewhere else.",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "I checked my watch and now my heart is racing."}],
+  "detected_tier": 2
+}
+Input15= {
+  "patient_id": "P001",
+  "user_input": "Everything is so loud. It hurts my head!",
+  "patient_info": {"triggers": ["Loud noises"]},
+  "chat_history": [{"role": "user", "content": "Is there a siren outside?"}],
+  "detected_tier": 2
+}
+Input16= {
+  "patient_id": "P001",
+  "user_input": "Help me! I fell in the kitchen and I can't move my leg!",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "I'm going to get some water..."}, {"role": "user", "content": "(Sound of a crash)"}],
+  "detected_tier": 3
+}
+Input17= {
+  "patient_id": "P001",
+  "user_input": "My chest hurts so much. I can't breathe.",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "I don't feel very good."}, {"role": "assistant", "content": "What's wrong, John?"}],
+  "detected_tier": 3
+}
+Input18= {
+  "patient_id": "P001",
+  "user_input": "I'm going to kill myself. I've had enough of this.",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "Life isn't worth living like this anymore."}],
+  "detected_tier": 3
+}
+Input19= {
+  "patient_id": "P001",
+  "user_input": "There's smoke coming from the toaster! Fire!",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "I'm making some toast."}, {"role": "user", "content": "Oh no!"}],
+  "detected_tier": 3
+}
+Input20= {
+  "patient_id": "P001",
+  "user_input": "I took too many of my blue pills. I'm scared.",
+  "patient_info": {"name": "John Doe"},
+  "chat_history": [{"role": "user", "content": "I forgot if I took my medicine already."}],
+  "detected_tier": 3
+}
+
+
+
+
+
 
 
 
@@ -93,7 +175,7 @@ Input9= {
 def to_compact_json(data):
     return json.dumps(data, separators=(',', ':'))
 
-compact_input = to_compact_json(Input9)
+compact_input = to_compact_json(Input17)
 
 # 4. Create a prompt that forces JSON output
 # Assuming compact_input is defined elsewhere
