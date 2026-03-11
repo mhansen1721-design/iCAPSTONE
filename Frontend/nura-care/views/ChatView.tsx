@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PatientProfile } from '../types';
-import { ChevronLeft, Mic, Send, LogOut, XCircle, Square } from 'lucide-react';
+import type { PatientProfile } from '../types';
+import { ChevronLeft, Mic, MicOff, Send, XCircle, LogOut } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 
+// Define Message internally to ensure no import conflicts
 interface Message {
   sender: 'patient' | 'ai';
   text: string;
@@ -11,256 +12,267 @@ interface Message {
 
 interface ChatViewProps {
   patient: PatientProfile;
-  durationMinutes: number; 
+  durationMinutes: number;
   caregiverEmail: string;
   caregiverPassword: string;
   onBack: () => void;
-  onLogout: () => void; 
+  onLogout: () => void;
 }
 
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
 export const ChatView: React.FC<ChatViewProps> = ({ 
   patient, 
-  durationMinutes,
+  durationMinutes, 
   caregiverEmail, 
   caregiverPassword, 
-  onBack,
-  onLogout
+  onBack, 
+  onLogout 
 }) => {
-  // --- STATE MANAGEMENT ---
-  const [isPlaying, setIsPlaying] = useState(false); 
-  const [textInput, setTextInput] = useState('');
+  if (!patient) return null;
+
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isSessionOver, setIsSessionOver] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState('');
+  const [inputText, setInputText] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [isAiTyping, setIsAiTyping] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
+  const [isSessionOver, setIsSessionOver] = useState(false);
   
   const recognitionRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Message[]>([]);
-
-  const getTimestamp = () => new Date().toLocaleString();
-
-  // --- 1. HIDDEN BACKGROUND SESSION TIMER ---
-  useEffect(() => {
-    const totalMs = durationMinutes * 60 * 1000;
-    const sessionTimer = setTimeout(() => {
-      if (!isSessionOver) {
-        handleFinalExit(); // Auto-logout when time is up
-      }
-    }, totalMs);
-
-    return () => clearTimeout(sessionTimer);
-  }, [durationMinutes, isSessionOver]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, currentTranscript, isAiTyping]);
 
-  // --- 2. VOICE LOGIC WITH 10-SECOND SILENCE AUTO-SEND ---
-  
+  useEffect(() => {
+    const totalMs = durationMinutes * 60 * 1000;
+    const timer = setTimeout(() => {
+      handleFinalExit();
+    }, totalMs);
+    return () => clearTimeout(timer);
+  }, [durationMinutes]);
+
   useEffect(() => {
     if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; // Essential to detect silence over time
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
 
-      recognition.onstart = () => setIsRecording(true);
-      
-      recognition.onresult = (event: any) => {
-        let finalTranscript = '';
+      recognitionRef.current.onresult = (event: any) => {
+        let transcript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          }
+          transcript += event.results[i][0].transcript;
         }
+        setCurrentTranscript(transcript);
         
-        if (finalTranscript) {
-          setTextInput(finalTranscript);
-
-          // RESET SILENCE TIMER: Wait 10 seconds after speech ends before sending
-          if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-          
-          silenceTimeoutRef.current = setTimeout(() => {
-            if (finalTranscript.trim()) {
-              handleSendMessage(finalTranscript);
-              recognition.stop(); 
-            }
-          }, 5000); // 5 seconds it waits
-        }
+        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = setTimeout(() => {
+          if (transcript.trim()) handleSendMessage(transcript);
+        }, 5000);
       };
 
-      recognition.onerror = (event: any) => {
-        console.error("Speech Error:", event.error);
-        setIsRecording(false);
-      };
-
-      recognition.onend = () => setIsRecording(false);
-      recognitionRef.current = recognition;
+      recognitionRef.current.onstart = () => setIsListening(true);
+      recognitionRef.current.onend = () => setIsListening(false);
     }
+
+    return () => {
+        if (recognitionRef.current) recognitionRef.current.stop();
+        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+    };
   }, []);
 
-  const toggleSpeech = () => {
+  const toggleListening = () => {
     if (!recognitionRef.current) return;
-    if (isRecording) {
-      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+    if (isListening) {
       recognitionRef.current.stop();
+      if (currentTranscript.trim()) handleSendMessage(currentTranscript);
     } else {
-      setError(null);
-      recognitionRef.current.start();
+      setCurrentTranscript('');
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.warn("Recognition already started");
+      }
     }
   };
 
-  // --- 3. SESSION LOGIC ---
   const handleFinalExit = async () => {
-    setIsSessionOver(true); 
-    setShowExitConfirm(false);
-    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-    
+    setIsSessionOver(true);
+    if (recognitionRef.current) recognitionRef.current.stop();
+
+    const payload = {
+      email: caregiverEmail.toLowerCase().trim(),
+      password: caregiverPassword,
+      patient_id: patient.patient_id || (patient as any).id,
+      full_name: patient.full_name || patient.name,
+      messages: messagesRef.current
+    };
+
     try {
       await fetch("http://127.0.0.1:8000/chat/save-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: caregiverEmail,
-          password: caregiverPassword,
-          patient_id: patient.patient_id || patient.id,
-          full_name: patient.full_name || patient.name, 
-          messages: messagesRef.current 
-        }),
+        body: JSON.stringify(payload),
       });
-    } catch (err) {
-      console.error("Failed to save session logs:", err);
+    } catch (e) { 
+      console.error("Failed to save session logs:", e); 
     }
-    setTimeout(() => onLogout(), 2000);
+    
+    onLogout();
   };
 
-  const handleSendMessage = (overrideText?: string) => {
-    const messageText = overrideText || textInput;
-    if (!messageText.trim() || isSessionOver) return;
-    
-    // Clear any pending auto-send if user manually clicks send
-    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+  const handleSendMessage = (text?: string) => {
+    const val = text || inputText;
+    if (!val.trim()) return;
 
-    setMessages(prev => [...prev, { sender: 'patient', text: messageText, timestamp: getTimestamp() }]);
-    setTextInput('');
-    setIsPlaying(true);
+    setMessages(prev => [...prev, { 
+        sender: 'patient', 
+        text: val, 
+        timestamp: new Date().toLocaleString() 
+    }]);
     
+    setInputText('');
+    setCurrentTranscript('');
+    setIsAiTyping(true);
+
     setTimeout(() => {
-      setMessages(prev => [...prev, { sender: 'ai', text: `Response to: ${messageText}`, timestamp: getTimestamp() }]);
-      setIsPlaying(false);
-    }, 1000);
+      setMessages(prev => [...prev, { 
+        sender: 'ai', 
+        text: `I understand. Can you tell me more about that?`, 
+        timestamp: new Date().toLocaleString() 
+      }]);
+      setIsAiTyping(false);
+    }, 1500);
   };
+
+  // Helper to get topics regardless of key name (safeTopics vs approved_topics)
+  const topics = (patient as any).approved_topics || patient.safeTopics || [];
 
   return (
-    <div className="w-full h-screen flex flex-col relative overflow-hidden bg-[#0b0a1a]">
-      {/* Exit Overlays */}
+    <div className="w-full h-screen flex flex-col relative bg-[#171140] text-white font-sans overflow-hidden animate-in fade-in duration-700">
+      
+      {/* ORIGINAL STYLE EXIT CONFIRMATION */}
       {showExitConfirm && (
         <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-[#171140] border border-white/10 p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl">
-            <XCircle size={48} className="text-red-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">End Session?</h2>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-3 rounded-xl bg-white/5 text-white font-semibold">No</button>
-              <button onClick={handleFinalExit} className="flex-1 py-3 rounded-xl bg-red-500 text-white font-semibold">Yes, End</button>
+          <div className="bg-[#171140] border border-white/10 p-10 rounded-[2.5rem] max-w-sm w-full text-center shadow-2xl animate-in zoom-in duration-300">
+            <XCircle size={64} className="text-red-400 mx-auto mb-6" />
+            <h2 className="text-3xl font-black text-white mb-2 tracking-tighter">End Session?</h2>
+            <div className="flex gap-4">
+              <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-4 rounded-2xl bg-white/5 text-white font-bold hover:bg-white/10">No</button>
+              <button onClick={handleFinalExit} className="flex-1 py-4 rounded-2xl bg-red-500 text-white font-bold hover:bg-red-600 shadow-lg shadow-red-500/20">Yes, End</button>
             </div>
           </div>
         </div>
       )}
 
-      {isSessionOver && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center">
-            <LogOut size={40} className="text-red-400 mb-4" />
-            <h1 className="text-4xl font-black text-white">Session Ended</h1>
+      {/* HEADER (AVATAR REMOVED) */}
+      <header className="p-8 flex justify-between items-center shrink-0">
+        <div className="flex flex-col">
+          <h2 className="text-white font-black text-2xl leading-none">{patient.name}</h2>
+          <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest mt-2">Live Session</p>
         </div>
-      )}
 
-      {/* Header (Timer Hidden) */}
-      <header className="p-6 z-50 flex items-center justify-between bg-[#171140]/50 backdrop-blur-md border-b border-white/5">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full text-white transition-all">
-            <ChevronLeft size={24} />
-          </button>
-          <div className="flex items-center gap-3">
-            <Avatar size="sm" type={patient.avatarType} emotion={isPlaying ? 'happy' : 'neutral'} />
-            <h2 className="text-white font-semibold">{patient.full_name || patient.name}</h2>
-          </div>
-        </div>
-        <button onClick={() => setShowExitConfirm(true)} className="px-6 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-sm font-bold hover:bg-red-500 hover:text-white transition-all">
+        <button 
+          onClick={() => setShowExitConfirm(true)} 
+          className="px-8 py-3 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-black text-xs tracking-widest uppercase hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/5"
+        >
           End Session
         </button>
       </header>
 
-      {/* Chat Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-40 scrollbar-hide">
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center opacity-40">
-            <Avatar size="xl" type={patient.avatarType} emotion="neutral" />
-            <h3 className="text-3xl font-bold text-white mt-6 text-center tracking-tight">
-              Hello, {patient.full_name || patient.name}.<br/>
-              <span className="text-[#715ffa]">Let's Talk!</span>
-            </h3>
+      {/* MAIN VIEW */}
+      <div className="flex-1 flex flex-col md:flex-row w-full max-w-7xl mx-auto px-12 gap-12 items-center overflow-hidden">
+        <div className="flex-1 flex flex-col h-full justify-center py-10">
+          <div className={`transition-all duration-1000 ${messages.length === 0 ? 'translate-y-0' : '-translate-y-8'}`}>
+            <h1 className="text-6xl md:text-8xl font-black mb-8 leading-tight tracking-tighter drop-shadow-2xl">
+              How are you, <br/>{patient.name}?
+            </h1>
           </div>
-        ) : (
-          messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.sender === 'patient' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}>
-               <div className={`max-w-[80%] p-4 rounded-2xl text-white ${msg.sender === 'patient' ? 'bg-[#715ffa]' : 'bg-white/5 border border-white/10'}`}>
-                  {msg.text}
-               </div>
-            </div>
-          ))
-        )}
-        <div ref={scrollRef} />
-      </div>
-
-      {/* Interaction Footer */}
-      <footer className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-[#0b0a1a] to-transparent z-50">
-        <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
-          {isRecording && (
-            <div className="flex items-center gap-2 bg-[#715ffa]/20 px-4 py-2 rounded-full border border-[#715ffa]/30">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
-              <span className="text-indigo-200 text-xs font-bold uppercase">Listening...</span>
-            </div>
-          )}
-
-          <div className="w-full flex gap-3 items-center">
-            <div className="flex-1 relative flex items-center bg-white/5 border border-white/10 rounded-3xl p-2 backdrop-blur-xl">
-              <input 
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Type a message..."
-                className="flex-1 bg-transparent py-3 px-4 text-white focus:outline-none"
-                disabled={isSessionOver}
-              />
-              <button 
-                onClick={() => handleSendMessage()}
-                className={`p-3 rounded-2xl transition-all ${textInput.trim() ? 'bg-[#715ffa] text-white' : 'bg-white/5 text-white/20'}`}
-                disabled={!textInput.trim() || isSessionOver}
-              >
-                <Send size={20} />
-              </button>
-            </div>
-
-            <button
-              onClick={toggleSpeech}
-              disabled={isSessionOver}
-              className={`flex items-center gap-2 px-6 py-4 rounded-3xl font-bold transition-all shadow-xl active:scale-95 ${
-                isRecording ? 'bg-red-500 text-white' : 'bg-white text-[#0b0a1a]'
-              }`}
-            >
-              {isRecording ? <Square size={20} /> : <Mic size={20} className="text-[#715ffa]" />}
-              <span>{isRecording ? "Stop" : "Speak"}</span>
-            </button>
+          
+          <div className={`overflow-y-auto flex flex-col gap-8 pr-4 scrollbar-hide transition-opacity duration-500 ${messages.length === 0 && !currentTranscript ? 'opacity-0' : 'opacity-100 h-1/2'}`}>
+            {messages.map((msg, i) => (
+              <div key={i} className={`text-3xl md:text-4xl font-bold tracking-tight ${msg.sender === 'patient' ? 'text-white/90 text-right' : 'text-indigo-300 text-left'}`}>
+                {msg.text}
+              </div>
+            ))}
+            {currentTranscript && (
+                <div className="text-3xl text-white/40 italic text-right animate-pulse">{currentTranscript}...</div>
+            )}
+            {isAiTyping && (
+                <div className="flex gap-2 py-4"><span className="w-3 h-3 bg-indigo-400 rounded-full animate-bounce" /></div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
         </div>
-      </footer>
+
+        <div className="w-full md:w-2/5 flex flex-col items-center justify-center shrink-0">
+          <div className="relative mb-12">
+            {isListening && <div className="absolute inset-0 bg-blue-400/20 rounded-full blur-[100px] animate-pulse" />}
+            <div className={`transition-transform duration-500 ${isAiTyping || isListening ? 'scale-110' : 'scale-100'}`}>
+                <Avatar size="2xl" type={patient.avatarType} emotion={isAiTyping ? 'happy' : 'neutral'} />
+            </div>
+          </div>
+          <button 
+            onClick={toggleListening}
+            className={`px-12 py-7 rounded-full flex items-center justify-center gap-6 border-2 transition-all w-full max-w-md shadow-2xl active:scale-95 ${
+              isListening ? 'bg-red-500 border-red-400 shadow-red-500/40' : 'bg-[#715ffa] border-indigo-400 shadow-indigo-500/40'
+            }`}
+          >
+            {isListening ? (
+              <><MicOff size={36} /><span className="text-2xl font-black">FINISH TALKING</span></>
+            ) : (
+              <><Mic size={36} /><span className="text-2xl font-black uppercase tracking-tight">Click me to speak</span></>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* BOTTOM AREA (DYNAMIC TOPICS) */}
+      <div className="w-full max-w-4xl mx-auto p-12 shrink-0 flex flex-col gap-8 bg-gradient-to-t from-[#171140] to-transparent z-50">
+        <div className="flex flex-col gap-4">
+          {topics.length > 0 && (
+            <>
+              <p className="text-sm text-white/40 font-bold ml-4 tracking-wide uppercase">Or type your message:</p>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {topics.map((topic: string, idx: number) => (
+                  <button 
+                    key={idx} 
+                    onClick={() => handleSendMessage(`Let's talk about ${topic.toLowerCase()}`)} 
+                    className="whitespace-nowrap px-6 py-3 rounded-full bg-white/5 hover:bg-white/10 text-white/90 border border-white/10 transition-all font-medium text-base active:scale-95"
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4 bg-white/5 p-2.5 rounded-full border border-white/10 backdrop-blur-xl shadow-2xl">
+          <input 
+            type="text" 
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+            placeholder="Let's chat :)"
+            className="flex-1 bg-transparent px-8 py-4 text-white placeholder:text-white/30 focus:outline-none text-xl font-medium"
+            disabled={isSessionOver}
+          />
+          <button 
+            onClick={() => handleSendMessage()}
+            disabled={!inputText.trim() || isSessionOver}
+            className={`p-4 rounded-full transition-all flex items-center justify-center ${inputText.trim() ? 'bg-[#715ffa] text-white shadow-lg' : 'bg-white/5 text-white/20'}`}
+          >
+            <Send size={24} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

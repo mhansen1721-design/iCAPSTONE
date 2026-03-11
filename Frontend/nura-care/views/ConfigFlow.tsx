@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DementiaStage } from '../types';
-import type { PatientProfile, AvatarType, FamilyMember } from '../types';
+import type { PatientProfile, AvatarType } from '../types';
 import { Avatar } from '../components/Avatar';
 import {
   CheckCircle2, User, Brain, X,
@@ -13,13 +13,15 @@ interface ConfigFlowProps {
   patient: PatientProfile | null;
   onSave: (patient: PatientProfile) => void;
   onBack: () => void;
+  isSubView?: boolean; // Fixed: Now exists to satisfy PatientDetail call
 }
 
+// Fixed: Age is 0 instead of undefined to satisfy 'number' type
 const EmptyPatient: PatientProfile = {
-  id: '',
+  patient_id: '',
   name: '',
   avatarType: 'jellyfish',
-  age: undefined,
+  age: 0,
   stage: DementiaStage.EARLY,
   description: '',
   familyMembers: [],
@@ -39,11 +41,11 @@ const STEPS = [
 ] as const;
 
 export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient, onSave, onBack }) => {
-  // Initialize with either the existing patient or a fresh ID
-  const [formData, setFormData] = useState<PatientProfile>(patient || { ...EmptyPatient, id: crypto.randomUUID() });
+  const [formData, setFormData] = useState<PatientProfile>(patient || { ...EmptyPatient });
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
   const [newLifestyle, setNewLifestyle] = useState('');
   const [famName, setFamName] = useState('');
   const [famRel, setFamRel] = useState('');
@@ -52,54 +54,46 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
 
   const activeSection = STEPS[currentStep].id;
 
-  // --- 1. DATA HYDRATION ---
-  // This maps backend keys (full_name, key_people) into the frontend state (name, familyMembers)
   useEffect(() => {
     if (patient) {
       const p = patient as any;
       setFormData({
         ...patient,
+        patient_id: p.patient_id || p.id || '',
         name: p.full_name || p.name || '',
-        age: p.age || undefined,
+        age: p.age || 0, // Fixed: Ensures age is never undefined
         stage: p.dementia_stage || p.stage || DementiaStage.EARLY,
         description: p.patient_story || p.description || '',
+        // Fixed: Safely handles arrays to prevent 'possibly undefined' errors
         lifestyles: p.hobbies_and_career 
           ? (typeof p.hobbies_and_career === 'string' ? p.hobbies_and_career.split(', ') : p.hobbies_and_career)
-          : patient.lifestyles || [],
-        familyMembers: p.key_people 
-          ? p.key_people.map((kp: any) => ({
-              id: kp.id || crypto.randomUUID(),
-              name: kp.name,
-              relation: kp.relation
-            }))
-          : patient.familyMembers || [],
+          : (patient.lifestyles || []),
+        familyMembers: p.key_people || p.familyMembers || [],
         triggers: p.known_triggers || p.triggers || [],
         safeTopics: p.approved_topics || p.safeTopics || []
       });
     }
   }, [patient]);
 
-  // --- 2. VALIDATION ---
   const validateStep = (stepIndex: number) => {
     setError(null);
     const stepId = STEPS[stepIndex].id;
     if (stepId === 'basics') {
-      if (!formData.name.trim()) return "Full Name is required.";
+      if (!formData.name?.trim()) return "Full Name is required.";
       if (!formData.age || formData.age <= 0) return "A valid Age is required.";
     }
-    if (stepId === 'reminiscence' && formData.familyMembers.length < 1) return "Add at least 1 Key Person.";
+    if (stepId === 'reminiscence' && (formData.familyMembers?.length || 0) < 1) return "Add at least 1 Key Person.";
     if (stepId === 'safety') {
-      if (formData.safeTopics.length < 3) return "Add at least 3 Approved Topics.";
-      if (formData.triggers.length < 3) return "Add at least 3 Known Triggers.";
+      if ((formData.safeTopics?.length || 0) < 3) return "Add at least 3 Approved Topics.";
+      if ((formData.triggers?.length || 0) < 3) return "Add at least 3 Known Triggers.";
     }
     return null;
   };
 
-  // --- 3. SAVE HANDLERS ---
   const handleNext = () => {
     const errorMsg = validateStep(currentStep);
     if (errorMsg) { setError(errorMsg); return; }
-    if (currentStep < STEPS.length - 1) setCurrentStep(prev => prev + 1);
+    setCurrentStep(prev => prev + 1);
   };
 
   const handleBackStep = () => {
@@ -112,115 +106,138 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
     if (errorMsg) { setError(errorMsg); return; }
     
     setIsLoading(true);
-    const email = caregiverEmail.toLowerCase().trim();
+    setError(null);
 
-    // Map React state back to Python's Pydantic model keys
+    // Fixed: Payload now maps to your Python Pydantic Model exactly
     const backendPayload = {
-      patient_id: formData.patient_id || formData.id,
-      full_name: formData.name.trim(),
-      age: Number(formData.age) || 0,
+      patient_id: formData.patient_id || null,
+      full_name: (formData.name || '').trim(),
+      age: parseInt(String(formData.age)) || 0,
       dementia_stage: formData.stage,
       patient_story: formData.description || "",
-      hobbies_and_career: formData.lifestyles.join(", "),
-      key_people: formData.familyMembers.map(m => ({ name: m.name, relation: m.relation })),
-      approved_topics: formData.safeTopics,
-      known_triggers: formData.triggers
+      hobbies_and_career: (formData.lifestyles || []).join(", "),
+      key_people: (formData.familyMembers || []).map(m => ({ name: m.name, relation: m.relation })),
+      approved_topics: formData.safeTopics || [],
+      known_triggers: formData.triggers || []
     };
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/patients/save/${encodeURIComponent(email)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(backendPayload)
-      });
-      
-      const result = await response.json();
+        // Fixed: Used caregiverEmail prop correctly instead of 'email'
+        const response = await fetch(`http://127.0.0.1:8000/patients/save/${encodeURIComponent(caregiverEmail.toLowerCase().trim())}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(backendPayload)
+        });
+        
+        const result = await response.json();
       
       if (response.ok && result.success) {
-        // Return the updated data to App.tsx
         onSave({ 
           ...formData, 
-          patient_id: result.patient_id || formData.id,
-          id: result.patient_id || formData.id 
+          patient_id: result.patient_id, 
+          id: result.patient_id 
         });
       } else {
-        setError(result.detail || "Failed to save profile.");
+        const msg = Array.isArray(result.detail) ? result.detail[0].msg : result.detail;
+        setError(msg || "Failed to save profile.");
+        setIsLoading(false);
       }
     } catch (err) {
       setError("Server connection failed. Is the Python backend running?");
-    } finally {
       setIsLoading(false);
     }
   };
 
-  // --- 4. TAG HELPERS ---
   const addTag = (field: 'lifestyles' | 'triggers' | 'safeTopics', value: string, setter: (s: string) => void) => {
     if (!value.trim()) return;
-    setFormData(prev => ({ ...prev, [field]: [...prev[field], value.trim()] }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [field]: [...(prev[field] || []), value.trim()] 
+    }));
     setter('');
   };
 
   const removeTag = (field: 'lifestyles' | 'triggers' | 'safeTopics', index: number) => {
-    setFormData(prev => ({ ...prev, [field]: prev[field].filter((_, i) => i !== index) }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [field]: (prev[field] || []).filter((_, i) => i !== index) 
+    }));
   };
 
   const addFamilyMember = () => {
     if (!famName.trim() || !famRel.trim()) return;
+    const newMember = { name: famName, relation: famRel };
     setFormData(prev => ({ 
       ...prev, 
-      familyMembers: [...prev.familyMembers, { id: crypto.randomUUID(), name: famName, relation: famRel }] 
+      familyMembers: [...(prev.familyMembers || []), newMember] 
     }));
     setFamName(''); setFamRel('');
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 animate-in fade-in duration-700 pb-40">
+    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 animate-in fade-in duration-700 pb-40 text-white">
       <div className="max-w-3xl mx-auto w-full">
         
-        {/* STEP 1: BASICS */}
         {activeSection === 'basics' && (
           <div className="space-y-10 animate-in slide-in-from-right-8 duration-500">
-            <div className="flex justify-center items-end gap-12 w-full max-w-2xl px-8 mx-auto">
+             <div className="flex justify-center items-end gap-12 w-full max-w-2xl px-8 mx-auto">
               {AVATAR_OPTIONS.map((type) => (
                 <button 
                   key={type} 
                   type="button"
                   onClick={() => setFormData(p => ({...p, avatarType: type}))} 
-                  className={`relative p-6 rounded-[2.5rem] transition-all duration-500 group flex flex-col items-center ${formData.avatarType === type ? 'bg-indigo-500/20 scale-110 ring-2 ring-indigo-400 z-10' : 'opacity-40 grayscale hover:grayscale-0'}`}
+                  className={`relative p-6 rounded-[2.5rem] transition-all duration-500 flex flex-col items-center ${formData.avatarType === type ? 'bg-indigo-500/20 scale-110 ring-2 ring-indigo-400' : 'opacity-40 grayscale'}`}
                 >
                   <Avatar size="md" type={type} emotion={formData.avatarType === type ? 'happy' : 'neutral'} />
-                  {formData.avatarType === type && <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-indigo-400 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full shadow-xl">Selected</div>}
+                  {formData.avatarType === type && (
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-indigo-400 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full">Selected</div>
+                  )}
                 </button>
               ))}
             </div>
 
             <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-6 text-indigo-100 border-b border-white/5 pb-4"><User size={24} className="text-indigo-400" /> Personal Information</h3>
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-6 text-indigo-100 border-b border-white/5 pb-4">
+                <User size={24} className="text-indigo-400" /> Personal Information
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="md:col-span-3">
-                  <label className="block text-base font-bold text-indigo-300 mb-2">Full Name <span className="text-red-400">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400" />
+                  <label className="block text-base font-bold text-indigo-300 mb-2">Full Name *</label>
+                  <input 
+                    type="text" 
+                    value={formData.name || ''} 
+                    onChange={(e) => setFormData({...formData, name: e.target.value})} 
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-400 outline-none" 
+                  />
                 </div>
                 <div>
-                  <label className="block text-base font-bold text-indigo-300 mb-2">Age <span className="text-red-400">*</span></label>
-                  <input type="number" value={formData.age ?? ''} onChange={(e) => setFormData({...formData, age: parseInt(e.target.value) || undefined})} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400" placeholder="0" />
+                  <label className="block text-base font-bold text-indigo-300 mb-2">Age *</label>
+                  <input 
+                    type="number" 
+                    value={formData.age === 0 ? '' : formData.age} 
+                    onChange={(e) => setFormData({...formData, age: parseInt(e.target.value) || 0})} 
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-400 outline-none" 
+                    placeholder="0" 
+                  />
                 </div>
               </div>
             </div>
 
             <div className="glass-panel p-8 rounded-[2rem] border-l-8 border-l-purple-500/50 border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><Brain size={24} className="text-purple-400" /> Dementia Stage <span className="text-red-400">*</span></h3>
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
+                <Brain size={24} className="text-purple-400" /> Dementia Stage *
+              </h3>
               <div className="grid grid-cols-1 gap-4">
-                {[
-                  { value: DementiaStage.EARLY, title: "Mild", desc: "Mostly independent but have occasional memory lapses" },
-                  { value: DementiaStage.MIDDLE, title: "Moderate", desc: "Sometimes confused about time/place, or struggle to find words" },
-                  { value: DementiaStage.LATE, title: "Severe", desc: "Verbal communication is difficult" }
-                ].map((option) => (
-                  <button key={option.value} type="button" onClick={() => setFormData(prev => ({ ...prev, stage: option.value as DementiaStage }))} className={`p-5 rounded-2xl border text-left transition-all flex flex-col gap-2 relative group ${formData.stage === option.value ? 'bg-indigo-500/20 border-indigo-400 shadow-xl' : 'bg-black/20 border-white/10 hover:bg-white/5'}`}>
-                    <div className={`font-bold text-lg flex items-center justify-between ${formData.stage === option.value ? 'text-indigo-300' : 'text-white'}`}>
-                      {option.title} {formData.stage === option.value && <CheckCircle2 size={20} className="text-indigo-400" />}
+                {[DementiaStage.EARLY, DementiaStage.MIDDLE, DementiaStage.LATE].map((stage) => (
+                  <button 
+                    key={stage} 
+                    type="button" 
+                    onClick={() => setFormData(prev => ({ ...prev, stage }))} 
+                    className={`p-5 rounded-2xl border text-left transition-all flex flex-col gap-2 ${formData.stage === stage ? 'bg-indigo-500/20 border-indigo-400' : 'bg-black/20 border-white/10'}`}
+                  >
+                    <div className="font-bold text-lg flex items-center justify-between text-white">
+                      {stage} {formData.stage === stage && <CheckCircle2 size={20} className="text-indigo-400" />}
                     </div>
-                    <p className="text-base text-indigo-200/70">{option.desc}</p>
                   </button>
                 ))}
               </div>
@@ -228,73 +245,118 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
           </div>
         )}
 
-        {/* STEP 2: REMINISCENCE */}
         {activeSection === 'reminiscence' && (
           <div className="space-y-6 animate-in slide-in-from-right-8 duration-500">
             <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 border-b border-white/5 pb-4"><BookOpen size={24} className="text-cyan-400" /> Patient Story</h3>
-              <textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white min-h-[120px] focus:border-indigo-400 outline-none" placeholder="Describe their life..." />
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 border-b border-white/5 pb-4">
+                <BookOpen size={24} className="text-cyan-400" /> Patient Story
+              </h3>
+              <textarea 
+                value={formData.description || ''} 
+                onChange={(e) => setFormData({...formData, description: e.target.value})} 
+                className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white min-h-[120px] focus:border-indigo-400 outline-none" 
+                placeholder="Describe their life, personality, or important memories..." 
+              />
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl border-t-8 border-t-amber-500/50">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 border-b border-white/5 pb-4"><Briefcase size={24} className="text-amber-400" /> Hobbies & Career</h3>
+            <div className="glass-panel p-8 rounded-[2rem] border-white/10 border-t-8 border-t-amber-500/50">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 pb-4">
+                <Briefcase size={24} className="text-amber-400" /> Hobbies & Career
+              </h3>
               <div className="flex gap-3 mb-6">
-                <input type="text" value={newLifestyle} onChange={(e) => setNewLifestyle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('lifestyles', newLifestyle, setNewLifestyle)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" placeholder="e.g. Piano Teacher" />
-                <button type="button" onClick={() => addTag('lifestyles', newLifestyle, setNewLifestyle)} className="bg-[#715ffa] px-6 rounded-xl font-bold text-2xl shadow-lg transition-all active:scale-90">+</button>
+                <input 
+                  type="text" 
+                  value={newLifestyle} 
+                  onChange={(e) => setNewLifestyle(e.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && addTag('lifestyles', newLifestyle, setNewLifestyle)} 
+                  className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" 
+                  placeholder="e.g. Piano Teacher, Gardening" 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => addTag('lifestyles', newLifestyle, setNewLifestyle)} 
+                  className="bg-indigo-500 px-6 rounded-xl font-bold text-white"
+                >
+                  +
+                </button>
               </div>
               <div className="flex flex-wrap gap-3">
-                {formData.lifestyles.map((tag, idx) => (
-                  <span key={idx} className="bg-amber-500/10 border border-amber-500/20 text-amber-100 px-4 py-2 rounded-xl text-base font-bold flex items-center gap-3">{tag}<button type="button" onClick={() => removeTag('lifestyles', idx)}><X size={18}/></button></span>
+                {(formData.lifestyles || []).map((tag, idx) => (
+                  <span key={idx} className="bg-amber-500/10 border border-amber-500/20 text-amber-100 px-4 py-2 rounded-xl flex items-center gap-3">
+                    {tag}
+                    <button type="button" onClick={() => removeTag('lifestyles', idx)}><X size={14}/></button>
+                  </span>
                 ))}
               </div>
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl border-t-8 border-t-pink-500/50">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><Users size={24} className="text-pink-400" /> Key People <span className="text-red-400">*</span></h3>
+            <div className="glass-panel p-8 rounded-[2rem] border-white/10 border-t-8 border-t-pink-500/50">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
+                <Users size={24} className="text-pink-400" /> Key People *
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {formData.familyMembers.map((member) => (
-                  <div key={member.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between group">
-                    <div><h4 className="font-bold text-white">{member.name}</h4><p className="text-sm text-indigo-300">{member.relation}</p></div>
-                    <button type="button" onClick={() => setFormData(p => ({...p, familyMembers: p.familyMembers.filter(m => m.id !== member.id)}))}><X size={18} className="text-red-300" /></button>
+                {(formData.familyMembers || []).map((member, idx) => (
+                  <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-white">{member.name}</h4>
+                      <p className="text-sm text-indigo-300">{member.relation}</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setFormData(p => ({...p, familyMembers: (p.familyMembers || []).filter((_, i) => i !== idx)}))}
+                    >
+                      <X size={18} className="text-red-300" />
+                    </button>
                   </div>
                 ))}
               </div>
               <div className="bg-black/20 rounded-2xl p-5 border border-white/5 flex flex-col gap-4">
-                <div className="flex gap-4">
-                  <input type="text" value={famName} onChange={(e) => setFamName(e.target.value)} placeholder="Name" className="flex-1 bg-black/20 border border-white/10 rounded-xl p-3 text-white" />
-                  <input type="text" value={famRel} onChange={(e) => setFamRel(e.target.value)} placeholder="Relation" className="flex-1 bg-black/20 border border-white/10 rounded-xl p-3 text-white" />
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="text" value={famName} onChange={(e) => setFamName(e.target.value)} placeholder="Name" className="bg-black/20 border border-white/10 rounded-xl p-3 text-white" />
+                  <input type="text" value={famRel} onChange={(e) => setFamRel(e.target.value)} placeholder="Relation" className="bg-black/20 border border-white/10 rounded-xl p-3 text-white" />
                 </div>
-                <button type="button" onClick={addFamilyMember} className="bg-pink-500/80 hover:bg-pink-500 text-white py-3 rounded-xl font-bold shadow-lg">Add Person</button>
+                <button type="button" onClick={addFamilyMember} className="bg-pink-500/80 hover:bg-pink-500 text-white py-3 rounded-xl font-bold transition-colors">
+                  Add Person
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 3: SAFETY */}
         {activeSection === 'safety' && (
           <div className="space-y-8 animate-in slide-in-from-right-8 duration-500">
-            <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-green-500/50 shadow-xl border-white/10">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><CheckCircle2 size={26} className="text-green-400" /> Approved Topics <span className="text-red-400">*</span></h3>
+            <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-green-500/50 border-white/10 shadow-xl">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
+                <CheckCircle2 size={26} className="text-green-400" /> Approved Topics *
+              </h3>
               <div className="flex gap-3 mb-6">
-                <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('safeTopics', newTopic, setNewTopic)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white" placeholder="Add a safe topic..." />
-                <button type="button" onClick={() => addTag('safeTopics', newTopic, setNewTopic)} className="bg-green-500/20 px-6 rounded-xl font-bold text-green-200 shadow-sm transition-all active:scale-90">+</button>
+                <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('safeTopics', newTopic, setNewTopic)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" placeholder="e.g. Classical Music" />
+                <button type="button" onClick={() => addTag('safeTopics', newTopic, setNewTopic)} className="bg-green-500/20 px-6 rounded-xl font-bold text-green-200">+</button>
               </div>
               <div className="flex flex-wrap gap-3">
-                {formData.safeTopics.map((tag, idx) => (
-                  <span key={idx} className="bg-green-500/10 border border-green-500/20 text-green-100 px-4 py-2 rounded-xl font-bold flex items-center gap-3">{tag}<button type="button" onClick={() => removeTag('safeTopics', idx)}><X size={18}/></button></span>
+                {(formData.safeTopics || []).map((tag, idx) => (
+                  <span key={idx} className="bg-green-500/10 border border-green-500/20 text-green-100 px-4 py-2 rounded-xl flex items-center gap-3">
+                    {tag}
+                    <button type="button" onClick={() => removeTag('safeTopics', idx)}><X size={14}/></button>
+                  </span>
                 ))}
               </div>
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-red-500/50 shadow-xl border-white/10">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><AlertCircle size={26} className="text-red-400" /> Known Triggers <span className="text-red-400">*</span></h3>
+            <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-red-500/50 border-white/10 shadow-xl">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
+                <AlertCircle size={26} className="text-red-400" /> Known Triggers *
+              </h3>
               <div className="flex gap-3 mb-6">
-                <input type="text" value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('triggers', newTrigger, setNewTrigger)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white" placeholder="Add a trigger..." />
-                <button type="button" onClick={() => addTag('triggers', newTrigger, setNewTrigger)} className="bg-red-500/20 px-6 rounded-xl font-bold text-red-200 shadow-sm transition-all active:scale-90">+</button>
+                <input type="text" value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('triggers', newTrigger, setNewTrigger)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" placeholder="e.g. Late for work" />
+                <button type="button" onClick={() => addTag('triggers', newTrigger, setNewTrigger)} className="bg-red-500/20 px-6 rounded-xl font-bold text-red-200">+</button>
               </div>
               <div className="flex flex-wrap gap-3">
-                {formData.triggers.map((tag, idx) => (
-                  <span key={idx} className="bg-red-500/10 border border-red-500/20 text-red-100 px-4 py-2 rounded-xl font-bold flex items-center gap-3">{tag}<button type="button" onClick={() => removeTag('triggers', idx)}><X size={18}/></button></span>
+                {(formData.triggers || []).map((tag, idx) => (
+                  <span key={idx} className="bg-red-500/10 border border-red-500/20 text-red-100 px-4 py-2 rounded-xl flex items-center gap-3">
+                    {tag}
+                    <button type="button" onClick={() => removeTag('triggers', idx)}><X size={14}/></button>
+                  </span>
                 ))}
               </div>
             </div>
@@ -302,31 +364,26 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
         )}
       </div>
 
-      {/* Floating Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[#171140] via-[#171140]/90 to-transparent z-50">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
           {error && (
-            <div className="w-full bg-red-500/20 border border-red-500/50 text-red-100 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in">
-              <AlertTriangle size={24} className="text-red-400 flex-shrink-0" />
+            <div className="w-full bg-red-500/20 border border-red-500/50 text-red-100 px-6 py-4 rounded-2xl flex items-center gap-3 animate-pulse">
+              <AlertTriangle size={24} className="text-red-400 shrink-0" />
               <p className="font-bold">{error}</p>
             </div>
           )}
           <div className="flex gap-4 w-full">
-            <button onClick={onBack} className="px-8 py-5 rounded-[1.5rem] bg-white/5 text-white/50 font-bold border border-white/10 active:scale-95 transition-all">
-              Cancel
-            </button>
+            <button type="button" onClick={onBack} className="px-8 py-5 rounded-[1.5rem] bg-white/5 text-white/50 font-bold border border-white/10 hover:bg-white/10 transition-all">Cancel</button>
             {currentStep > 0 && (
-              <button onClick={handleBackStep} className="px-8 py-5 rounded-[1.5rem] bg-white/10 text-white font-bold border border-white/10 active:scale-95 transition-all">
-                <ArrowLeft size={24} />
-              </button>
+              <button type="button" onClick={handleBackStep} className="px-8 py-5 rounded-[1.5rem] bg-white/10 text-white font-bold border border-white/10 hover:bg-white/20 transition-all"><ArrowLeft size={24} /></button>
             )}
             <button 
               onClick={currentStep < STEPS.length - 1 ? handleNext : handleFinalSave} 
               disabled={isLoading} 
-              className="flex-1 bg-white text-[#171140] text-xl font-black py-5 rounded-[1.5rem] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              className="flex-1 bg-white text-[#171140] text-xl font-black py-5 rounded-[1.5rem] shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              {isLoading ? "Saving..." : currentStep < STEPS.length - 1 ? `Next: ${STEPS[currentStep + 1].label}` : "Save Companion Settings"}
-              {currentStep < STEPS.length - 1 ? <ArrowRight size={24} /> : <CheckCircle2 size={24} />}
+              {isLoading ? "Saving..." : currentStep < STEPS.length - 1 ? "Next" : "Save Companion Settings"}
+              {!isLoading && (currentStep < STEPS.length - 1 ? <ArrowRight size={24} /> : <CheckCircle2 size={24} />)}
             </button>
           </div>
         </div>

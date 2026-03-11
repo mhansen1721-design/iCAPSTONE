@@ -123,9 +123,16 @@ def save_or_update_patient(email: str, data: PatientProfile):
         raise HTTPException(status_code=404, detail="Caregiver account not found.")
     
     patient_dict = data.model_dump()
-    final_id = patient_dict.get("patient_id") or f"P-{int(datetime.datetime.now().timestamp())}"
-    patient_dict["patient_id"] = final_id
     
+    # 1. Handle Patient ID
+    incoming_id = patient_dict.get("patient_id")
+    if not incoming_id:
+        final_id = f"P-{int(datetime.datetime.now().timestamp())}"
+        patient_dict["patient_id"] = final_id
+    else:
+        final_id = incoming_id
+
+    # 2. Update Patient Profile in db_patients.json
     patients = db[email_key].get("patients", [])
     updated = False
     for i, p in enumerate(patients):
@@ -139,7 +146,24 @@ def save_or_update_patient(email: str, data: PatientProfile):
     
     db[email_key]["patients"] = patients
     save_json(DB_FILE, db)
+
+    # 3. SYNC NAME TO CHAT LOGS
+    # We load the chat logs and look for any sessions belonging to this patient_id
+    # to update the "full_name" field so the Logs view stays current.
+    logs = load_json(CHAT_LOGS_FILE)
+    new_name = patient_dict.get("full_name", "Unnamed")
+
+    if email_key in logs:
+        # The structure is logs[email][password][patient_id]
+        for password_key in logs[email_key]:
+            if final_id in logs[email_key][password_key]:
+                logs[email_key][password_key][final_id]["full_name"] = new_name
+        
+        save_json(CHAT_LOGS_FILE, logs)
+    
     return {"success": True, "patient_id": final_id}
+    
+
 
 @app.delete("/patients/delete/{email}/{patient_id}")
 async def delete_patient_profile(email: str, patient_id: str): # Added async
@@ -222,3 +246,4 @@ def get_chat_logs():
     """Returns the entire chat logs JSON to the frontend."""
     logs = load_json(CHAT_LOGS_FILE)
     return logs
+

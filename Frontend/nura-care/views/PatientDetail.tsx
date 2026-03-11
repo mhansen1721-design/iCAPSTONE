@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PatientProfile, SessionLog } from '../types';
+import type { PatientProfile, SessionLog } from '../types';
 import { ChevronLeft, LayoutDashboard, Settings, History } from 'lucide-react';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { ConfigFlow } from './ConfigFlow';
@@ -87,6 +87,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
         {activeTab === 'config' && (
           <ConfigFlow 
             patient={patient} 
+            caregiverEmail={caregiverEmail}
             onSave={onSaveConfig} 
             onBack={() => setActiveTab('analytics')} 
             isSubView={true}

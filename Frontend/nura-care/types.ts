@@ -7,35 +7,27 @@ export enum DementiaStage {
 export type AvatarType = 'jellyfish' | 'panda' | 'axolotl';
 
 
+// types.ts
 export interface FamilyMember {
-  id: string;
   name: string;
   relation: string;
-  photo?: string;
-  notes?: string;
 }
 
 export interface PatientProfile {
-  id: string;
-  patient_id?: string; // Critical: Fixes the 'patient_id does not exist' error
-  name: string;
-  full_name?: string;  // Added for backend compatibility
+  patient_id: string; // Primary ID
+  id?: string;        // Optional alias
+  name: string;       // We'll use this for the UI
   avatarType: AvatarType;
   age: number;
   stage: DementiaStage;
-  dementia_stage?: string; // Added for backend compatibility
   description: string;
-  
-  // Personalization
-  familyMembers: FamilyMember[];
-  lifestyles: string[]; // Hobbies & Career
-  mediaDocs: string[]; // Scanned letters, albums
-  triggers: string[]; // Known confusion/stress topics
-  safeTopics: string[]; // Approved topics
-  
-  // AI Suggestions Status
+  familyMembers: FamilyMember[]; // Required (initialize as empty array [])
+  lifestyles: string[];          // Required
+  triggers: string[];            // Required
+  safeTopics: string[];          // Required
   aiSuggestionsLoaded: boolean;
 }
+  
 
 export interface AISuggestionResponse {
   suggestedSafeTopics: string[];
@@ -51,4 +43,4 @@ export interface SessionLog {
 }
 
 // types.ts
-export type ViewState = 'LOGIN' | 'ROLE_SELECTION' | 'DASHBOARD' | 'PATIENT_DETAIL' | 'CONFIG' | 'CHAT' | 'LOGS';
+export type ViewState = 'LOGIN' | 'ROLE_SELECTION' | 'DASHBOARD' | 'PATIENT_DETAIL' | 'CONFIG' | 'CHAT' | 'LOGS' | 'PATIENT_PICKER';
