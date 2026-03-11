@@ -216,3 +216,9 @@ def delete_caregiver_account(data: dict):
         save_json(CHAT_LOGS_FILE, logs)
         
     return {"success": True}
+
+@app.get("/chat/logs")
+def get_chat_logs():
+    """Returns the entire chat logs JSON to the frontend."""
+    logs = load_json(CHAT_LOGS_FILE)
+    return logs

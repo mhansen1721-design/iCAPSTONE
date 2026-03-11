@@ -11,12 +11,12 @@ interface PatientDetailProps {
   onBack: () => void;
   onSaveConfig: (updatedProfile: PatientProfile) => void;
   onStartChat: (mins: number) => void;
-  caregiverEmail: string; // Needed for ConfigFlow
+  caregiverEmail: string; 
 }
 
 export const PatientDetail: React.FC<PatientDetailProps> = ({ 
   patient, 
-  sessionLogs, 
+  sessionLogs, // These are already perfectly filtered by App.tsx!
   onBack, 
   onSaveConfig,
   onStartChat,
@@ -24,9 +24,6 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'analytics' | 'config' | 'logs'>('analytics');
   const [logFilter, setLogFilter] = useState<string | undefined>(undefined);
-
-  // Filter logs for this specific patient
-  const filteredLogs = sessionLogs.filter(log => (log.full_name === patient.full_name));
 
   const handleNavigateToLogs = (filter?: string) => {
     setLogFilter(filter);
@@ -83,7 +80,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
         {activeTab === 'analytics' && (
           <AnalyticsDashboard 
             patient={patient} 
-            logs={filteredLogs} 
+            logs={sessionLogs} // Swapped filteredLogs for sessionLogs
             onNavigateToLogs={handleNavigateToLogs}
           />
         )}
@@ -97,7 +94,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
         )}
         {activeTab === 'logs' && (
           <SessionLogs 
-            logs={filteredLogs} 
+            logs={sessionLogs} // Swapped filteredLogs for sessionLogs
             onBack={() => setActiveTab('analytics')} 
             isSubView={true}
             initialFilter={logFilter}

@@ -50,4 +50,5 @@ export interface SessionLog {
   transcript: string;
 }
 
-export type ViewState = 'LOGIN' | 'ROLE_SELECTION' | 'DASHBOARD' | 'PATIENT_DETAIL' | 'CONFIG' | 'CHAT' | 'SESSION_LOGS';
+// types.ts
+export type ViewState = 'LOGIN' | 'ROLE_SELECTION' | 'DASHBOARD' | 'PATIENT_DETAIL' | 'CONFIG' | 'CHAT' | 'LOGS';

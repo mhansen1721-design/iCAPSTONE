@@ -4,6 +4,7 @@ import { Avatar } from '../components/Avatar';
 
 interface RoleSelectionProps {
   onSelectRole: (role: 'caregiver' | 'patient') => void;
+  onBack: () => void;
 }
 
 export const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole }) => {
