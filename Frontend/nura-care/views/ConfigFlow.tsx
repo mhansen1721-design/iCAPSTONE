@@ -48,19 +48,16 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
  const [newLifestyle, setNewLifestyle] = useState('');
  const [famName, setFamName] = useState('');
  const [famRel, setFamRel] = useState('');
- const [famPhoto, setFamPhoto] = useState<string | null>(null);
  const [newTrigger, setNewTrigger] = useState('');
  const [newTopic, setNewTopic] = useState('');
 
  const activeSection = STEPS[currentStep].id;
 
- // --- 2. THE MEMORY FIX: SYNC PROP TO STATE ---
- // This ensures that when the "patient" prop changes (on Edit), the form actually populates
+ // --- 2. SYNC PROP TO STATE ---
  useEffect(() => {
    if (patient) {
      setFormData({
        ...patient,
-       // Mapping backend keys (full_name, patient_story) to internal state names if necessary
        name: (patient as any).full_name || patient.name || '',
        stage: (patient as any).dementia_stage || (patient as any).stage || DementiaStage.EARLY,
        description: (patient as any).patient_story || patient.description || '',
@@ -82,14 +79,26 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
    }
  }, [patient]);
 
- // --- 3. LOGIC FUNCTIONS ---
- const validateStep = (step: number) => {
+ // --- 3. LOGIC FUNCTIONS & VALIDATION ---
+ const validateStep = (stepIndex: number) => {
    setError(null);
-   if (step === 0) {
+   const stepId = STEPS[stepIndex].id;
+
+   if (stepId === 'basics') {
      if (!formData.name.trim()) return "Full Name is required.";
+     if (!formData.age || formData.age <= 0) return "A valid Age is required.";
      if (!formData.stage) return "Dementia Stage is required.";
    }
-   // Step 1 & 2 validation can be added here if you want to make them mandatory again
+
+   if (stepId === 'reminiscence') {
+     if (formData.familyMembers.length < 1) return "Please add at least 1 Key Person (family or friend).";
+   }
+
+   if (stepId === 'safety') {
+     if (formData.safeTopics.length < 3) return "Please add at least 3 Approved Topics.";
+     if (formData.triggers.length < 3) return "Please add at least 3 Known Triggers.";
+   }
+
    return null;
  };
 
@@ -111,7 +120,6 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
    setIsLoading(true);
    const email = caregiverEmail.toLowerCase().trim();
   
-   // Clean payload: Providing fallbacks to prevent backend validation errors
    const backendPayload = {
      patient_id: formData.patient_id || formData.id,
      full_name: formData.name.trim() || "Unnamed",
@@ -133,7 +141,7 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
 
      const result = await response.json();
      if (response.ok && result.success) {
-       // Merge backend patient_id back into local state before returning
+       // On successful save, pass the data back. Parent should then route to 'patientdetail'
        onSave({ ...formData, patient_id: result.patient_id || formData.id });
      } else {
        setError(result.detail || "Failed to save profile.");
@@ -190,7 +198,6 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
      </header>
 
      <div className="flex-1 overflow-y-auto pr-2 pb-32 scroll-smooth">
-       {/* Progress Bar */}
        <div className="max-w-2xl mx-auto mb-10 px-4">
          <div className="flex justify-between items-end mb-3">
             <span className="text-2xl font-black text-white">{STEPS[currentStep].label}</span>
@@ -216,14 +223,14 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
 
              <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl">
                <h3 className="flex items-center gap-3 text-xl font-bold mb-6 text-indigo-100 border-b border-white/5 pb-4"><User size={24} className="text-indigo-400" /> Personal Information</h3>
-               <div className="space-y-6">
-                 <div>
+               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                 <div className="md:col-span-3">
                    <label className="block text-base font-bold text-indigo-300 mb-2">Full Name <span className="text-red-400">*</span></label>
                    <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400" />
                  </div>
                   <div>
-                   <label className="block text-base font-bold text-indigo-300 mb-2">Age</label>
-                   <input type="number" value={formData.age ?? ''} onChange={(e) => setFormData({...formData, age: parseInt(e.target.value) || undefined})} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" />
+                   <label className="block text-base font-bold text-indigo-300 mb-2">Age <span className="text-red-400">*</span></label>
+                   <input type="number" value={formData.age ?? ''} onChange={(e) => setFormData({...formData, age: parseInt(e.target.value) || undefined})} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400" placeholder="0" />
                  </div>
                </div>
              </div>
@@ -270,7 +277,8 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
              </div>
 
              <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl border-t-8 border-t-pink-500/50">
-               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><Users size={24} className="text-pink-400" /> Key People</h3>
+               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><Users size={24} className="text-pink-400" /> Key People <span className="text-red-400">*</span></h3>
+               <p className="text-indigo-300/70 text-sm mb-4">Add at least one person they recognize.</p>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                  {formData.familyMembers.map((member) => (
                    <div key={member.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between group">
@@ -297,7 +305,8 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
          {activeSection === 'safety' && (
            <div className="space-y-8 animate-in slide-in-from-right-8 duration-500 px-2">
              <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-green-500/50 shadow-xl border-white/10">
-               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><CheckCircle2 size={26} className="text-green-400" /> Approved Topics</h3>
+               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><CheckCircle2 size={26} className="text-green-400" /> Approved Topics <span className="text-red-400">*</span></h3>
+               <p className="text-indigo-300/70 text-sm mb-4">Add at least 3 topics (e.g., Gardening, Jazz music, Italy).</p>
                <div className="flex gap-3 mb-6">
                  <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('safeTopics', newTopic, setNewTopic)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" placeholder="Add a safe topic..." />
                  <button onClick={() => addTag('safeTopics', newTopic, setNewTopic)} className="bg-green-500/20 px-6 rounded-xl font-bold text-green-200 shadow-sm transition-all active:scale-90">+</button>
@@ -310,7 +319,8 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
              </div>
 
              <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-red-500/50 shadow-xl border-white/10">
-               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><AlertCircle size={26} className="text-red-400" /> Known Triggers</h3>
+               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100"><AlertCircle size={26} className="text-red-400" /> Known Triggers <span className="text-red-400">*</span></h3>
+               <p className="text-indigo-300/70 text-sm mb-4">Add at least 3 triggers (e.g., Mentioning the hospital, Loud noises).</p>
                <div className="flex gap-3 mb-6">
                  <input type="text" value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('triggers', newTrigger, setNewTrigger)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" placeholder="Add a trigger..." />
                  <button onClick={() => addTag('triggers', newTrigger, setNewTrigger)} className="bg-red-500/20 px-6 rounded-xl font-bold text-red-200 shadow-sm transition-all active:scale-90">+</button>

@@ -142,21 +142,28 @@ def save_or_update_patient(email: str, data: PatientProfile):
     return {"success": True, "patient_id": final_id}
 
 @app.delete("/patients/delete/{email}/{patient_id}")
-def delete_patient_profile(email: str, patient_id: str):
+async def delete_patient_profile(email: str, patient_id: str): # Added async
     db = load_json(DB_FILE)
     email_key = email.lower().strip()
+    
     if email_key not in db:
         raise HTTPException(status_code=404, detail="Caregiver not found.")
     
     patients = db[email_key].get("patients", [])
-    filtered_patients = [p for p in patients if p.get("patient_id") != patient_id]
     
-    if len(filtered_patients) == len(patients):
+    # Check if patient exists before filtering
+    patient_exists = any(p.get("patient_id") == patient_id for p in patients)
+    if not patient_exists:
          raise HTTPException(status_code=404, detail="Patient ID not found.")
 
+    # Filter out the patient
+    filtered_patients = [p for p in patients if p.get("patient_id") != patient_id]
+    
     db[email_key]["patients"] = filtered_patients
     save_json(DB_FILE, db)
-    return {"success": True}
+    
+    # Return a clean 200 OK with the success body
+    return {"success": True, "message": "Patient deleted successfully"}
 
 # --- 5. SESSION LOGGING ---
 @app.post("/chat/save-session")
@@ -198,7 +205,7 @@ def delete_caregiver_account(data: dict):
     db = load_json(DB_FILE)
     
     if email not in db or db[email]["password"] != password:
-        raise HTTPException(status_code=401, detail="Invalid credentials.")
+        raise HTTPException(status_code=401, detail="Invalid credentials. Could not find your account.")
     
     del db[email]
     save_json(DB_FILE, db)

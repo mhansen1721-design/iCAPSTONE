@@ -1,29 +1,4 @@
 {
-    "a@gmail.com": {
-        "full_name": "Mya",
-        "email": "a@gmail.com",
-        "password": "2",
-        "patients": [
-            {
-                "patient_id": "P-1772673432",
-                "full_name": "2",
-                "age": 2,
-                "dementia_stage": "Middle Stage (Moderate)",
-                "patient_story": "2",
-                "hobbies_and_career": "",
-                "key_people": [
-                    {
-                        "name": "2",
-                        "relation": "2"
-                    }
-                ],
-                "approved_topics": [],
-                "known_triggers": [
-                    "2"
-                ]
-            }
-        ]
-    },
     "t@gmail": {
         "full_name": "T",
         "email": "t@gmail",
@@ -61,29 +36,6 @@
                 "patient_story": "",
                 "hobbies_and_career": "",
                 "key_people": [],
-                "approved_topics": [],
-                "known_triggers": []
-            }
-        ]
-    },
-    "a@a": {
-        "full_name": "A",
-        "email": "a@a",
-        "password": "a",
-        "patients": [
-            {
-                "patient_id": "f67a298c-0c43-4234-bc8a-6cecbe298340",
-                "full_name": "A2",
-                "age": 0,
-                "dementia_stage": "Middle Stage (Moderate)",
-                "patient_story": "",
-                "hobbies_and_career": "",
-                "key_people": [
-                    {
-                        "name": "Afra",
-                        "relation": "Mother"
-                    }
-                ],
                 "approved_topics": [],
                 "known_triggers": []
             }

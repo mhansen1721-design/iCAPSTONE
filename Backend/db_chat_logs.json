@@ -1,38 +1,4 @@
 {
-    "a@gmail.com": {
-        "2": {
-            "P-1772673432": {
-                "full_name": "2",
-                "sessions": [
-                    {
-                        "timestamp": "2026-03-04 22:17:55",
-                        "transcript": [
-                            {
-                                "sender": "patient",
-                                "text": "pls work part 2",
-                                "timestamp": "3/4/2026, 10:17:00 PM"
-                            },
-                            {
-                                "sender": "ai",
-                                "text": "pls work part 2",
-                                "timestamp": "3/4/2026, 10:17:01 PM"
-                            },
-                            {
-                                "sender": "patient",
-                                "text": "i beg",
-                                "timestamp": "3/4/2026, 10:17:03 PM"
-                            },
-                            {
-                                "sender": "ai",
-                                "text": "i beg",
-                                "timestamp": "3/4/2026, 10:17:04 PM"
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-    },
     "1@t": {
         "1": {
             "P-1772684148": {
@@ -57,59 +23,6 @@
                     "transcript": []
                 }
             ]
-        }
-    },
-    "a@a": {
-        "a": {
-            "f67a298c-0c43-4234-bc8a-6cecbe298340": {
-                "full_name": "A2",
-                "sessions": [
-                    {
-                        "timestamp": "2026-03-05 15:01:05",
-                        "transcript": [
-                            {
-                                "sender": "patient",
-                                "text": "hello",
-                                "timestamp": "3/5/2026, 2:59:29 PM"
-                            },
-                            {
-                                "sender": "ai",
-                                "text": "Response to: hello",
-                                "timestamp": "3/5/2026, 2:59:30 PM"
-                            },
-                            {
-                                "sender": "patient",
-                                "text": "testing testing testing testing",
-                                "timestamp": "3/5/2026, 2:59:41 PM"
-                            },
-                            {
-                                "sender": "ai",
-                                "text": "Response to: testing testing testing testing",
-                                "timestamp": "3/5/2026, 2:59:42 PM"
-                            }
-                        ]
-                    },
-                    {
-                        "timestamp": "2026-03-05 15:05:07",
-                        "transcript": [
-                            {
-                                "sender": "patient",
-                                "text": "hello hello hello",
-                                "timestamp": "3/5/2026, 3:04:25 PM"
-                            },
-                            {
-                                "sender": "ai",
-                                "text": "Response to: hello hello hello",
-                                "timestamp": "3/5/2026, 3:04:26 PM"
-                            }
-                        ]
-                    },
-                    {
-                        "timestamp": "2026-03-05 16:08:03",
-                        "transcript": []
-                    }
-                ]
-            }
         }
     }
 }

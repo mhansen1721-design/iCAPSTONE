@@ -1,132 +1,159 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Background } from '../components/Background';
 import { Login } from '../views/Login';
+import { RoleSelection } from '../views/RoleSelection';
 import { Dashboard } from '../views/Dashboard';
 import { ConfigFlow } from '../views/ConfigFlow';
 import { ChatView } from '../views/ChatView';
-import type { PatientProfile, ViewState } from '../types';
+import { PatientDetail } from '../views/PatientDetail';
+import type { PatientProfile, ViewState, SessionLog } from '../types';
 
 export default function App() {
-  const [view, setView] = useState<ViewState>('LOGIN');
+  // --- 1. NAVIGATION & ROLE STATE ---
+  const [view, setView] = useState<ViewState>('LOGIN'); 
+  const [userRole, setUserRole] = useState<'caregiver' | 'patient' | null>(null);
+
+  // --- 2. DATA STATE ---
   const [patients, setPatients] = useState<PatientProfile[]>([]);
+  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [activeChatPatientId, setActiveChatPatientId] = useState<string | null>(null);
-  const [caregiverEmail, setCaregiverEmail] = useState<string>('');
   
-  // REQUIRED: To satisfy backend organization (Email > Password > Patient)
+  // --- 3. AUTH & SESSION STATE ---
+  const [caregiverEmail, setCaregiverEmail] = useState<string>('');
   const [caregiverPassword, setCaregiverPassword] = useState<string>('');
   const [chatDuration, setChatDuration] = useState<number>(15);
 
-  /**
-   * Captures credentials from the Login component. 
-   * Ensure your Login.tsx calls this with both arguments: onLogin(email, password)
-   */
+  // --- 4. FLOW HANDLERS ---
+  
   const handleLogin = (email: string, password?: string) => {
     setCaregiverEmail(email.toLowerCase().trim());
-    if (password) {
-      setCaregiverPassword(password);
-    }
+    if (password) setCaregiverPassword(password);
+    setView('ROLE_SELECTION'); 
+  };
+
+  const handleSelectRole = (role: 'caregiver' | 'patient') => {
+    setUserRole(role);
     setView('DASHBOARD');
   };
 
-  /**
-   * Resets all session data and returns to login
-   */
-  const handleLogout = () => {
-    setCaregiverEmail('');
-    setCaregiverPassword('');
-    setActiveChatPatientId(null);
-    setEditingPatientId(null);
-    setView('LOGIN');
-  };
-
-  const handleAddPatient = () => {
-    setEditingPatientId(null);
-    setView('CONFIG');
-  };
-
-  const handleEditPatient = (id: string) => {
+  const handleViewPatientDetail = (id: string) => {
     setEditingPatientId(id);
-    setView('CONFIG');
+    setActiveChatPatientId(null); 
+    setView('PATIENT_DETAIL');
   };
 
-  const handleDeletePatient = (id: string) => {
-    setPatients(prev => prev.filter(p => (p.patient_id || p.id) !== id));
-  };
-
-  const handleStartChatWithTimer = (id: string, minutes: number) => {
+  const handleStartChat = (id: string, minutes: number) => {
     setChatDuration(minutes);
     setActiveChatPatientId(id);
     setView('CHAT');
   };
 
+  const handleLogout = () => {
+    setCaregiverEmail('');
+    setCaregiverPassword('');
+    setPatients([]);
+    setUserRole(null);
+    setEditingPatientId(null);
+    setView('LOGIN');
+  };
+
+  // --- NEW: DELETION HANDLERS ---
+  const onDeletePatient = (id: string) => {
+    setPatients(prev => prev.filter(p => (p.patient_id || p.id) !== id));
+    if (editingPatientId === id) setEditingPatientId(null);
+  };
+
+  const onDeleteAccount = () => {
+    // This is the trigger that fixes the "stuck on dashboard after delete" issue
+    handleLogout(); // Clears everything and redirects to LOGIN
+  };
+
   const handleSaveConfig = (updatedProfile: PatientProfile) => {
+    const syncedProfile = {
+      ...updatedProfile,
+      name: updatedProfile.name || updatedProfile.full_name || 'Unnamed Patient'
+    };
+
     setPatients(prev => {
-      const targetId = updatedProfile.patient_id || updatedProfile.id;
+      const targetId = syncedProfile.patient_id || syncedProfile.id;
       const exists = prev.find(p => (p.patient_id || p.id) === targetId);
       
       if (exists) {
-        return prev.map(p => (p.patient_id || p.id) === targetId ? updatedProfile : p);
+        return prev.map(p => (p.patient_id || p.id) === targetId ? syncedProfile : p);
       }
-      return [...prev, updatedProfile];
+      return [...prev, syncedProfile];
     });
-    setView('DASHBOARD');
+
+    if (view === 'CONFIG') {
+      setView('DASHBOARD');
+      setEditingPatientId(null);
+    } else {
+      setView('PATIENT_DETAIL');
+    }
   };
 
-  // Helper to find current active profiles
-  const currentPatientToEdit = React.useMemo(() => {
-  if (!editingPatientId) return null;
-  return patients.find(p => 
-    p.patient_id === editingPatientId || 
-    p.id === editingPatientId || 
-    String(p.patient_id) === String(editingPatientId)
-  ) || null;
-}, [editingPatientId, patients]);
-    
-  const currentChatPatient = activeChatPatientId
-    ? patients.find(p => (p.patient_id || p.id) === activeChatPatientId) || null
-    : null;
+  // --- 5. SELECTOR ---
+  const currentPatient = useMemo(() => {
+    const targetId = editingPatientId || activeChatPatientId;
+    if (!targetId) return null;
+    return patients.find(p => (p.patient_id || p.id) === targetId) || null;
+  }, [editingPatientId, activeChatPatientId, patients]);
 
   return (
     <main className="min-h-screen text-slate-50 relative">
       <Background />
       
-      {/* 1. Login View */}
-      {view === 'LOGIN' && (
-        <Login onLogin={handleLogin} />
+      {view === 'LOGIN' && <Login onLogin={handleLogin} />}
+
+      {view === 'ROLE_SELECTION' && (
+        <RoleSelection onSelectRole={handleSelectRole} onBack={() => setView('LOGIN')} />
       )}
 
-      {/* 2. Dashboard View */}
       {view === 'DASHBOARD' && (
         <Dashboard 
           caregiverEmail={caregiverEmail} 
-          onAddPatient={handleAddPatient}
-          onEditPatient={handleEditPatient}
-          onDeletePatient={handleDeletePatient}
-          onChat={handleStartChatWithTimer}
+          caregiverPassword={caregiverPassword}
+          onAddPatient={() => { 
+            setEditingPatientId(null);
+            setView('CONFIG'); 
+          }}
+          onEditPatient={handleViewPatientDetail}
+          onChat={handleStartChat}
           onLogout={handleLogout}
           setAppPatients={setPatients}
+          onDeletePatient={onDeletePatient} // Passed to Dashboard
+          onDeleteAccount={onDeleteAccount} // Passed to Dashboard
         />
       )}
 
-      {/* 3. Patient Configuration Flow */}
+      {view === 'PATIENT_DETAIL' && currentPatient && (
+        <PatientDetail 
+          patient={currentPatient}
+          sessionLogs={sessionLogs}
+          caregiverEmail={caregiverEmail}
+          onBack={() => setView('DASHBOARD')}
+          onStartChat={(mins) => handleStartChat(currentPatient.patient_id || currentPatient.id, mins)}
+          onSaveConfig={handleSaveConfig}
+        />
+      )}
+
       {view === 'CONFIG' && (
         <ConfigFlow 
           caregiverEmail={caregiverEmail} 
-          patient={currentPatientToEdit}
+          patient={null}
           onSave={handleSaveConfig}
           onBack={() => setView('DASHBOARD')}
         />
       )}
 
-      {/* 4. Live Chat View (Auto-saves on end) */}
-      {view === 'CHAT' && currentChatPatient && (
+      {view === 'CHAT' && currentPatient && (
         <ChatView
-          patient={currentChatPatient}
+          patient={currentPatient}
           durationMinutes={chatDuration}
           caregiverEmail={caregiverEmail}
           caregiverPassword={caregiverPassword} 
-          onBack={() => setView('DASHBOARD')}
+          onBack={() => setView('PATIENT_DETAIL')}
           onLogout={handleLogout} 
         />
       )}

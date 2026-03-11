@@ -6,8 +6,6 @@ export enum DementiaStage {
 
 export type AvatarType = 'jellyfish' | 'panda' | 'axolotl';
 
-// Added ViewState with 'CHAT' to fix the App.tsx squiggle
-export type ViewState = 'LOGIN' | 'DASHBOARD' | 'CONFIG' | 'CHAT';
 
 export interface FamilyMember {
   id: string;
@@ -44,3 +42,12 @@ export interface AISuggestionResponse {
   suggestedTriggers: string[];
   suggestedActivity: string;
 }
+export interface SessionLog {
+  id: string;
+  patientId: string;
+  patientName: string;
+  timestamp: string;
+  transcript: string;
+}
+
+export type ViewState = 'LOGIN' | 'ROLE_SELECTION' | 'DASHBOARD' | 'PATIENT_DETAIL' | 'CONFIG' | 'CHAT' | 'SESSION_LOGS';
