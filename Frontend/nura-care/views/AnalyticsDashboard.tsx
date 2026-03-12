@@ -74,11 +74,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const data = payload[0].payload;
     return (
       <div className="bg-indigo-950/90 border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-md">
-        <p className="text-indigo-300 text-xs font-bold uppercase tracking-wider mb-2">{label}</p>
+        <p className="text-[var(--nura-dim)] text-xs font-bold uppercase tracking-wider mb-2">{label}</p>
         <div className="flex items-center gap-3">
           <span className="text-3xl">{data.emoji}</span>
           <div>
-            <p className="text-white font-black text-lg">{data.emotion}</p>
+            <p className="text-[var(--nura-text)] font-black text-lg">{data.emotion}</p>
             <p className="text-indigo-200/60 text-xs">Score: {data.score}%</p>
           </div>
         </div>
@@ -97,21 +97,21 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
   const [showDailyTime, setShowDailyTime] = React.useState(false);
 
   const PaginationControls = ({ current, total, onChange }: { current: number, total: number, onChange: (n: number) => void }) => (
-    <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
+    <div className="flex items-center gap-2 bg-[var(--nura-card)] rounded-lg p-1">
       <button 
         disabled={current >= total - 1}
         onClick={(e) => { e.stopPropagation(); onChange(current + 1); }}
-        className="p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-colors"
+        className="p-1 hover:bg-nura-accent/20 rounded disabled:opacity-30 transition-colors"
       >
         <ChevronLeft size={16} />
       </button>
-      <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-tighter">
+      <span className="text-[10px] font-bold text-[var(--nura-dim)] uppercase tracking-tighter">
         {current === 0 ? 'Current' : `Week -${current}`}
       </span>
       <button 
         disabled={current <= 0}
         onClick={(e) => { e.stopPropagation(); onChange(current - 1); }}
-        className="p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-colors"
+        className="p-1 hover:bg-nura-accent/20 rounded disabled:opacity-30 transition-colors"
       >
         <ChevronRight size={16} />
       </button>
@@ -121,7 +121,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
   return (
     <div className="space-y-8 pb-20">
       {/* A. Urgent Notifications */}
-      <section className="glass-panel p-6 rounded-3xl border-red-500/20 bg-red-500/5">
+      <section className="bg-[var(--nura-card)] p-6 rounded-3xl border-red-500/20 bg-red-500/5">
         <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-red-200">
           <AlertCircle className="text-red-400" /> Urgent Notifications
         </h3>
@@ -138,7 +138,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* B. Emotion Log Dashboard */}
-        <section className="glass-panel p-8 rounded-3xl border-white/10">
+        <section className="bg-[var(--nura-card)] p-8 rounded-3xl border-white/10">
           <div className="flex items-center justify-between mb-6">
             <h3 className="flex items-center gap-3 text-xl font-bold text-indigo-100">
               <TrendingUp className="text-indigo-400" /> Emotion & Cognitive Trend
@@ -178,18 +178,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
           <div className="grid grid-cols-2 gap-4 mt-6">
             <button 
               onClick={() => onNavigateToLogs('confused')}
-              className="bg-white/5 p-4 rounded-2xl text-left hover:bg-white/10 transition-all group border border-transparent hover:border-indigo-500/30"
+              className="bg-[var(--nura-card)] p-4 rounded-2xl text-left hover:bg-nura-accent/20 transition-all group border border-transparent hover:border-indigo-500/30"
             >
-              <p className="text-xs text-indigo-300 uppercase font-bold tracking-wider mb-1 group-hover:text-indigo-200">Confusion Events</p>
-              <p className="text-2xl font-black text-white">10 <span className="text-sm font-normal text-indigo-300/50">this week</span></p>
+              <p className="text-xs text-[var(--nura-dim)] uppercase font-bold tracking-wider mb-1 group-hover:text-indigo-200">Confusion Events</p>
+              <p className="text-2xl font-black text-[var(--nura-text)]">10 <span className="text-sm font-normal text-[var(--nura-dim)]/50">this week</span></p>
               <p className="text-[10px] text-indigo-400 font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity">View Logs →</p>
             </button>
             <button 
               onClick={() => onNavigateToLogs('trigger')}
-              className="bg-white/5 p-4 rounded-2xl text-left hover:bg-white/10 transition-all group border border-transparent hover:border-red-500/30"
+              className="bg-[var(--nura-card)] p-4 rounded-2xl text-left hover:bg-nura-accent/20 transition-all group border border-transparent hover:border-red-500/30"
             >
-              <p className="text-xs text-indigo-300 uppercase font-bold tracking-wider mb-1 group-hover:text-indigo-200">Distress Triggers</p>
-              <p className="text-2xl font-black text-white">3 <span className="text-sm font-normal text-indigo-300/50">detected</span></p>
+              <p className="text-xs text-[var(--nura-dim)] uppercase font-bold tracking-wider mb-1 group-hover:text-indigo-200">Distress Triggers</p>
+              <p className="text-2xl font-black text-[var(--nura-text)]">3 <span className="text-sm font-normal text-[var(--nura-dim)]/50">detected</span></p>
               <p className="text-[10px] text-red-400 font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity">View Logs →</p>
             </button>
           </div>
@@ -197,7 +197,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
 
         {/* C & D. Engagement Progress & Keywords */}
         <div className="space-y-8">
-          <section className="glass-panel p-8 rounded-3xl border-white/10">
+          <section className="bg-[var(--nura-card)] p-8 rounded-3xl border-white/10">
             <div className="flex items-center justify-between mb-4">
               <h3 className="flex items-center gap-3 text-xl font-bold text-indigo-100">
                 <Activity className="text-emerald-400" /> Engagement Progress
@@ -210,7 +210,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
                   <span className="text-sm font-bold text-indigo-200">Interaction Level</span>
                   <span className="text-sm font-bold text-emerald-400">{ENGAGEMENT_WEEKS[engagementWeek].level}%</span>
                 </div>
-                <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-3 bg-nura-card rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000" 
                     style={{ width: `${ENGAGEMENT_WEEKS[engagementWeek].level}%` }}
@@ -221,21 +221,21 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
               <div className="space-y-2">
                 <button 
                   onClick={() => setShowDailyTime(!showDailyTime)}
-                  className="w-full flex items-center justify-between bg-white/5 p-4 rounded-2xl hover:bg-white/10 transition-all group"
+                  className="w-full flex items-center justify-between bg-[var(--nura-card)] p-4 rounded-2xl hover:bg-nura-accent/20 transition-all group"
                 >
                   <div className="flex items-center gap-3">
                     <Clock className="text-indigo-400" size={20} />
                     <span className="text-sm text-indigo-200 font-medium">Average Time Spent in Chat</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl font-black text-white">{ENGAGEMENT_WEEKS[engagementWeek].avgTime} <span className="text-xs font-normal text-indigo-300/50">hrs/week</span></span>
+                    <span className="text-xl font-black text-[var(--nura-text)]">{ENGAGEMENT_WEEKS[engagementWeek].avgTime} <span className="text-xs font-normal text-[var(--nura-dim)]/50">hrs/week</span></span>
                     {showDailyTime ? <ChevronUp size={16} className="text-indigo-400" /> : <ChevronDown size={16} className="text-indigo-400" />}
                   </div>
                 </button>
                 
                 {showDailyTime && (
                   <div className="bg-black/20 rounded-2xl p-4 border border-white/5 animate-in slide-in-from-top-2 duration-300">
-                    <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mb-3">Daily Breakdown (Minutes)</p>
+                    <p className="text-[10px] font-bold text-[var(--nura-dim)] uppercase tracking-widest mb-3">Daily Breakdown (Minutes)</p>
                     <div className="flex items-end justify-between h-20 gap-1 px-2">
                       {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
                         <div key={i} className="flex flex-col items-center gap-1 flex-1">
@@ -243,7 +243,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
                             className="w-full bg-indigo-500/40 rounded-t-sm transition-all duration-500" 
                             style={{ height: `${(ENGAGEMENT_WEEKS[engagementWeek].daily[i] / 60) * 100}%` }}
                           />
-                          <span className="text-[8px] font-bold text-indigo-300/50">{day}</span>
+                          <span className="text-[8px] font-bold text-[var(--nura-dim)]/50">{day}</span>
                         </div>
                       ))}
                     </div>
@@ -253,7 +253,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
             </div>
           </section>
 
-          <section className="glass-panel p-8 rounded-3xl border-white/10">
+          <section className="bg-[var(--nura-card)] p-8 rounded-3xl border-white/10">
             <div className="flex items-center justify-between mb-6">
               <h3 className="flex items-center gap-3 text-xl font-bold text-indigo-100">
                 <MessageSquare className="text-blue-400" /> Common Keywords
@@ -284,8 +284,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
                     
                     {isHovered && (
                       <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-indigo-950 border border-white/10 px-3 py-1 rounded-lg shadow-xl z-50 whitespace-nowrap animate-in zoom-in-95 duration-200">
-                        <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Repeated</p>
-                        <p className="text-sm font-black text-white">{word.count} times</p>
+                        <p className="text-[10px] font-bold text-[var(--nura-dim)] uppercase tracking-widest">Repeated</p>
+                        <p className="text-sm font-black text-[var(--nura-text)]">{word.count} times</p>
                       </div>
                     )}
                   </div>
@@ -297,7 +297,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
       </div>
 
       {/* E. Weekly Summary (PDF-like) */}
-      <section className="glass-panel p-10 rounded-[2.5rem] border-white/10 bg-white/5 relative overflow-hidden">
+      <section className="bg-[var(--nura-card)] p-10 rounded-[2.5rem] border-white/10 bg-[var(--nura-card)] relative overflow-hidden">
         <div className="absolute top-0 left-0 p-8">
           <PaginationControls current={summaryWeek} total={SUMMARY_WEEKS.length} onChange={setSummaryWeek} />
         </div>
@@ -309,8 +309,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
         
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-10">
-            <h2 className="text-3xl font-black text-white mb-2">Weekly Care Summary</h2>
-            <p className="text-indigo-300 font-medium">{SUMMARY_WEEKS[summaryWeek].range}</p>
+            <h2 className="text-3xl font-black text-[var(--nura-text)] mb-2">Weekly Care Summary</h2>
+            <p className="text-[var(--nura-dim)] font-medium">{SUMMARY_WEEKS[summaryWeek].range}</p>
           </div>
 
           <div className="space-y-8">
@@ -322,12 +322,12 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-indigo-300/70">Most Responsive:</span>
-                    <span className="text-white font-bold">10:00 AM - 11:30 AM</span>
+                    <span className="text-[var(--nura-dim)]/70">Most Responsive:</span>
+                    <span className="text-[var(--nura-text)] font-bold">10:00 AM - 11:30 AM</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-indigo-300/70">Least Responsive:</span>
-                    <span className="text-white font-bold">4:00 PM - 6:00 PM</span>
+                    <span className="text-[var(--nura-dim)]/70">Least Responsive:</span>
+                    <span className="text-[var(--nura-text)] font-bold">4:00 PM - 6:00 PM</span>
                   </div>
                 </div>
               </div>
@@ -338,7 +338,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
                   Engagement
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-3xl font-black text-white">{SUMMARY_WEEKS[summaryWeek].engagement}%</span>
+                  <span className="text-3xl font-black text-[var(--nura-text)]">{SUMMARY_WEEKS[summaryWeek].engagement}%</span>
                   <span className={`text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-md ${SUMMARY_WEEKS[summaryWeek].change.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}`}>
                     {SUMMARY_WEEKS[summaryWeek].change} from last week
                   </span>
@@ -347,7 +347,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
             </div>
 
             <div className="border-t border-white/5 pt-8">
-              <h4 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-4">Caregiver Insights</h4>
+              <h4 className="text-sm font-bold text-[var(--nura-dim)] uppercase tracking-widest mb-4">Caregiver Insights</h4>
               <ul className="space-y-3 text-indigo-100 leading-relaxed">
                 <li className="flex items-start gap-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 shrink-0" />

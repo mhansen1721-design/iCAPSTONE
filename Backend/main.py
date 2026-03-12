@@ -58,6 +58,7 @@ class PatientProfile(BaseModel):
     dementia_stage: str = "Early"
     patient_story: Optional[str] = ""
     hobbies_and_career: Optional[str] = ""
+    avatarType: str = "jellyfish"
     key_people: List[KeyPerson] = []
     approved_topics: List[str] = []
     known_triggers: List[str] = []

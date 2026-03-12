@@ -48,74 +48,77 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 animate-in fade-in zoom-in duration-1000">
-      <RegisterModal 
-        isOpen={isRegisterOpen} 
-        onClose={() => setIsRegisterOpen(false)} 
-      />
+return (
+  <div className="flex flex-col items-center justify-center min-h-screen p-6 animate-in fade-in zoom-in duration-1000">
+    <RegisterModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} />
 
-      <div className="mb-10">
-        <Avatar size="xl" emotion={isLoading ? "neutral" : "happy"} />
-      </div>
-      
-      <h1 className="text-5xl font-extrabold mb-4 text-center tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-indigo-300">
-        Nura Care
-      </h1>
-      
-      <p className="text-indigo-200 text-center mb-12 text-lg max-w-md">
-        Compassionate AI companionship designed for peace of mind.
-      </p>
+    <div className="mb-8">
+      <Avatar size="xl" emotion={isLoading ? "neutral" : "happy"} />
+    </div>
+    
+    <h1 className="text-5xl font-extrabold mb-4 text-center text-[var(--nura-text)]">
+      Nura Care
+    </h1>
+    
+    <p className="text-[var(--nura-dim)] text-center mb-10 text-lg max-w-md font-medium">
+      Compassionate AI companionship designed for peace of mind.
+    </p>
 
-      <form 
-        onSubmit={handleManualLogin}
-        className="glass-panel p-8 rounded-3xl w-full max-w-md flex flex-col gap-4 border-white/10 shadow-2xl"
-      >
-        {error && !isRegisterOpen && (
-          <p className="text-red-400 text-sm text-center font-medium animate-in slide-in-from-top-2">
-            {error}
-          </p>
-        )}
-
-        <input 
-          type="email" 
-          autoComplete="email"
-          placeholder="Caregiver Email" 
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400 transition-colors"
-          required
-        />
+    {/* --- THE CARD CONTAINER --- */}
+    <div 
+      className="w-full max-w-sm p-8 rounded-[2.5rem] shadow-2xl backdrop-blur-md" 
+      style={{ 
+        /* Try card variable, fallback to dark translucent if empty */
+        backgroundColor: 'var(--nura-card, rgba(255, 255, 255, 0.05))', 
+        border: '1px solid rgba(255,255,255,0.1)' 
+      }}
+    >
+      <form onSubmit={handleManualLogin} className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
+          <input 
+            type="email" 
+            placeholder="Caregiver Email" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-[var(--nura-accent)] transition-all"
+            required
+          />
+          <input 
+            type="password" 
+            placeholder="Password" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-[var(--nura-accent)] transition-all"
+            required
+          />
+        </div>
         
-        <input 
-          type="password" 
-          autoComplete="current-password"
-          placeholder="Password" 
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400 transition-colors"
-          required
-        />
-        
+        {/* --- THE SIGN IN BUTTON (With Fallback) --- */}
         <button 
           type="submit"
           disabled={isLoading}
-          className="mt-2 bg-[#715ffa] hover:bg-[#8475ff] text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+          style={{ 
+            /* Try accent variable, fallback to solid purple so it NEVER disappears */
+            backgroundColor: 'var(--nura-accent, #715ffa)', 
+            color: 'white',
+            minHeight: '60px',
+            width: '100%',
+            display: 'block'
+          }}
+          className="font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all text-xl"
         >
           {isLoading ? "Connecting..." : "Sign In"}
         </button>
-
-        <button 
-          type="button"
-          onClick={() => {
-            setError(null);
-            setIsRegisterOpen(true);
-          }}
-          className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-4 rounded-xl transition-all active:scale-95"
-        >
-          Register
-        </button>
       </form>
     </div>
-  );
+
+    <button 
+      type="button"
+      onClick={() => setIsRegisterOpen(true)}
+      className="mt-8 text-[var(--nura-dim)] hover:text-[var(--nura-text)] font-bold transition-all underline underline-offset-8 decoration-2"
+    >
+      Need an account? Register
+    </button>
+  </div>
+);
 };

@@ -13,10 +13,9 @@ interface ConfigFlowProps {
   patient: PatientProfile | null;
   onSave: (patient: PatientProfile) => void;
   onBack: () => void;
-  isSubView?: boolean; // Fixed: Now exists to satisfy PatientDetail call
+  isSubView?: boolean; 
 }
 
-// Fixed: Age is 0 instead of undefined to satisfy 'number' type
 const EmptyPatient: PatientProfile = {
   patient_id: '',
   name: '',
@@ -61,10 +60,10 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
         ...patient,
         patient_id: p.patient_id || p.id || '',
         name: p.full_name || p.name || '',
-        age: p.age || 0, // Fixed: Ensures age is never undefined
+        avatarType: p.avatarType || 'jellyfish', // Ensure avatar is loaded
+        age: p.age || 0,
         stage: p.dementia_stage || p.stage || DementiaStage.EARLY,
         description: p.patient_story || p.description || '',
-        // Fixed: Safely handles arrays to prevent 'possibly undefined' errors
         lifestyles: p.hobbies_and_career 
           ? (typeof p.hobbies_and_career === 'string' ? p.hobbies_and_career.split(', ') : p.hobbies_and_career)
           : (patient.lifestyles || []),
@@ -108,10 +107,11 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
     setIsLoading(true);
     setError(null);
 
-    // Fixed: Payload now maps to your Python Pydantic Model exactly
+    // FIXED: Added avatarType to payload so it saves to the backend
     const backendPayload = {
       patient_id: formData.patient_id || null,
       full_name: (formData.name || '').trim(),
+      avatarType: formData.avatarType, 
       age: parseInt(String(formData.age)) || 0,
       dementia_stage: formData.stage,
       patient_story: formData.description || "",
@@ -122,7 +122,6 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
     };
 
     try {
-        // Fixed: Used caregiverEmail prop correctly instead of 'email'
         const response = await fetch(`http://127.0.0.1:8000/patients/save/${encodeURIComponent(caregiverEmail.toLowerCase().trim())}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -175,91 +174,120 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 animate-in fade-in duration-700 pb-40 text-white">
+    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 animate-in fade-in duration-700 pb-40 text-[var(--nura-text)]">
       <div className="max-w-3xl mx-auto w-full">
         
         {activeSection === 'basics' && (
           <div className="space-y-10 animate-in slide-in-from-right-8 duration-500">
+             {/* AVATAR PICKER */}
              <div className="flex justify-center items-end gap-12 w-full max-w-2xl px-8 mx-auto">
               {AVATAR_OPTIONS.map((type) => (
                 <button 
                   key={type} 
                   type="button"
                   onClick={() => setFormData(p => ({...p, avatarType: type}))} 
-                  className={`relative p-6 rounded-[2.5rem] transition-all duration-500 flex flex-col items-center ${formData.avatarType === type ? 'bg-indigo-500/20 scale-110 ring-2 ring-indigo-400' : 'opacity-40 grayscale'}`}
+                  className={`relative p-6 rounded-[2.5rem] transition-all duration-500 flex flex-col items-center ${formData.avatarType === type ? 'bg-indigo-500/20 scale-110 ring-2 ring-indigo-400' : 'opacity-40 grayscale hover:opacity-100'}`}
                 >
                   <Avatar size="md" type={type} emotion={formData.avatarType === type ? 'happy' : 'neutral'} />
                   {formData.avatarType === type && (
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-indigo-400 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full">Selected</div>
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-indigo-400 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg">Selected</div>
                   )}
                 </button>
               ))}
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl">
+            {/* PERSONAL INFO */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 shadow-xl">
               <h3 className="flex items-center gap-3 text-xl font-bold mb-6 text-indigo-100 border-b border-white/5 pb-4">
                 <User size={24} className="text-indigo-400" /> Personal Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="md:col-span-3">
-                  <label className="block text-base font-bold text-indigo-300 mb-2">Full Name *</label>
+                  <label className="block text-base font-bold text-[var(--nura-dim)] mb-2">Full Name *</label>
                   <input 
                     type="text" 
                     value={formData.name || ''} 
                     onChange={(e) => setFormData({...formData, name: e.target.value})} 
-                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-400 outline-none" 
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:border-indigo-400 outline-none" 
                   />
                 </div>
                 <div>
-                  <label className="block text-base font-bold text-indigo-300 mb-2">Age *</label>
+                  <label className="block text-base font-bold text-[var(--nura-dim)] mb-2">Age *</label>
                   <input 
                     type="number" 
                     value={formData.age === 0 ? '' : formData.age} 
                     onChange={(e) => setFormData({...formData, age: parseInt(e.target.value) || 0})} 
-                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-400 outline-none" 
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:border-indigo-400 outline-none" 
                     placeholder="0" 
                   />
                 </div>
               </div>
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-l-8 border-l-purple-500/50 border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
-                <Brain size={24} className="text-purple-400" /> Dementia Stage *
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                {[DementiaStage.EARLY, DementiaStage.MIDDLE, DementiaStage.LATE].map((stage) => (
-                  <button 
-                    key={stage} 
-                    type="button" 
-                    onClick={() => setFormData(prev => ({ ...prev, stage }))} 
-                    className={`p-5 rounded-2xl border text-left transition-all flex flex-col gap-2 ${formData.stage === stage ? 'bg-indigo-500/20 border-indigo-400' : 'bg-black/20 border-white/10'}`}
-                  >
-                    <div className="font-bold text-lg flex items-center justify-between text-white">
-                      {stage} {formData.stage === stage && <CheckCircle2 size={20} className="text-indigo-400" />}
-                    </div>
-                  </button>
-                ))}
+               <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-l-8 border-l-purple-500/50 border-white/10 shadow-xl">
+                      <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
+                          <Brain size={24} className="text-purple-400" /> Dementia Stage <span className="text-red-400">*</span>
+                      </h3>
+                      <p className="text-base text-indigo-200/80 mb-6">Helping the AI adjust conversational complexity and tone.</p>
+                      
+                      <div className="grid grid-cols-1 gap-4">
+                        {[
+                          {
+                            value: DementiaStage.EARLY,
+                            title: "Mild",
+                            desc: "They are mostly independent but have occasional memory lapses"
+                          },
+                          {
+                            value: DementiaStage.MIDDLE,
+                            title: "Moderate",
+                            desc: "They sometimes get confused about time or place, or struggle to find the right words"
+                          },
+                          {
+                            value: DementiaStage.LATE,
+                            title: "Severe",
+                            desc: "Verbal communication is difficult, and they respond best to music, touch, or visual cues"
+                          }
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => { setFormData(prev => ({ ...prev, stage: option.value as DementiaStage, aiSuggestionsLoaded: false })); setError(null); }}
+                            className={`p-5 rounded-2xl border text-left transition-all flex flex-col gap-2 relative overflow-hidden group ${
+                              formData.stage === option.value
+                                ? 'bg-indigo-500/20 border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.15)]'
+                                : 'bg-black/20 border-white/10 hover:bg-[var(--nura-card)] hover:border-white/30'
+                            }`}
+                          >
+                            <div className={`font-bold text-lg flex items-center justify-between ${formData.stage === option.value ? 'text-[var(--nura-dim)]' : 'text-[var(--nura-text)]'}`}>
+                              {option.title}
+                              {formData.stage === option.value && <CheckCircle2 size={20} className="text-indigo-400" />}
+                            </div>
+                            <p className="text-base text-indigo-200/70 leading-relaxed font-medium">
+                              {option.desc}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                  </div>
               </div>
-            </div>
-          </div>
-        )}
+          )}
 
         {activeSection === 'reminiscence' && (
           <div className="space-y-6 animate-in slide-in-from-right-8 duration-500">
-            <div className="glass-panel p-8 rounded-[2rem] border-white/10 shadow-xl">
+            {/* STORY */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 shadow-xl">
               <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 border-b border-white/5 pb-4">
                 <BookOpen size={24} className="text-cyan-400" /> Patient Story
               </h3>
               <textarea 
                 value={formData.description || ''} 
                 onChange={(e) => setFormData({...formData, description: e.target.value})} 
-                className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white min-h-[120px] focus:border-indigo-400 outline-none" 
+                className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] min-h-[120px] focus:border-indigo-400 outline-none" 
                 placeholder="Describe their life, personality, or important memories..." 
               />
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-white/10 border-t-8 border-t-amber-500/50">
+            {/* HOBBIES */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 border-t-8 border-t-amber-500/50">
               <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 pb-4">
                 <Briefcase size={24} className="text-amber-400" /> Hobbies & Career
               </h3>
@@ -269,13 +297,13 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
                   value={newLifestyle} 
                   onChange={(e) => setNewLifestyle(e.target.value)} 
                   onKeyDown={(e) => e.key === 'Enter' && addTag('lifestyles', newLifestyle, setNewLifestyle)} 
-                  className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" 
+                  className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none" 
                   placeholder="e.g. Piano Teacher, Gardening" 
                 />
                 <button 
                   type="button" 
                   onClick={() => addTag('lifestyles', newLifestyle, setNewLifestyle)} 
-                  className="bg-indigo-500 px-6 rounded-xl font-bold text-white"
+                  className="bg-indigo-500 px-6 rounded-xl font-bold text-[var(--nura-text)]"
                 >
                   +
                 </button>
@@ -290,16 +318,17 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
               </div>
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-white/10 border-t-8 border-t-pink-500/50">
+            {/* KEY PEOPLE */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 border-t-8 border-t-pink-500/50">
               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
                 <Users size={24} className="text-pink-400" /> Key People *
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {(formData.familyMembers || []).map((member, idx) => (
-                  <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+                  <div key={idx} className="bg-[var(--nura-card)] border border-white/10 rounded-2xl p-4 flex items-center justify-between">
                     <div>
-                      <h4 className="font-bold text-white">{member.name}</h4>
-                      <p className="text-sm text-indigo-300">{member.relation}</p>
+                      <h4 className="font-bold text-[var(--nura-text)]">{member.name}</h4>
+                      <p className="text-sm text-[var(--nura-dim)]">{member.relation}</p>
                     </div>
                     <button 
                       type="button" 
@@ -312,10 +341,10 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
               </div>
               <div className="bg-black/20 rounded-2xl p-5 border border-white/5 flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="text" value={famName} onChange={(e) => setFamName(e.target.value)} placeholder="Name" className="bg-black/20 border border-white/10 rounded-xl p-3 text-white" />
-                  <input type="text" value={famRel} onChange={(e) => setFamRel(e.target.value)} placeholder="Relation" className="bg-black/20 border border-white/10 rounded-xl p-3 text-white" />
+                  <input type="text" value={famName} onChange={(e) => setFamName(e.target.value)} placeholder="Name" className="bg-black/20 border border-white/10 rounded-xl p-3 text-[var(--nura-text)]" />
+                  <input type="text" value={famRel} onChange={(e) => setFamRel(e.target.value)} placeholder="Relation" className="bg-black/20 border border-white/10 rounded-xl p-3 text-[var(--nura-text)]" />
                 </div>
-                <button type="button" onClick={addFamilyMember} className="bg-pink-500/80 hover:bg-pink-500 text-white py-3 rounded-xl font-bold transition-colors">
+                <button type="button" onClick={addFamilyMember} className="bg-pink-500/80 hover:bg-pink-500 text-[var(--nura-text)] py-3 rounded-xl font-bold transition-colors">
                   Add Person
                 </button>
               </div>
@@ -325,12 +354,13 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
 
         {activeSection === 'safety' && (
           <div className="space-y-8 animate-in slide-in-from-right-8 duration-500">
-            <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-green-500/50 border-white/10 shadow-xl">
+            {/* TOPICS */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-t-8 border-t-green-500/50 border-white/10 shadow-xl">
               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
                 <CheckCircle2 size={26} className="text-green-400" /> Approved Topics *
               </h3>
               <div className="flex gap-3 mb-6">
-                <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('safeTopics', newTopic, setNewTopic)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" placeholder="e.g. Classical Music" />
+                <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('safeTopics', newTopic, setNewTopic)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none" placeholder="e.g. Classical Music" />
                 <button type="button" onClick={() => addTag('safeTopics', newTopic, setNewTopic)} className="bg-green-500/20 px-6 rounded-xl font-bold text-green-200">+</button>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -343,12 +373,13 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
               </div>
             </div>
 
-            <div className="glass-panel p-8 rounded-[2rem] border-t-8 border-t-red-500/50 border-white/10 shadow-xl">
+            {/* TRIGGERS */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-t-8 border-t-red-500/50 border-white/10 shadow-xl">
               <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
                 <AlertCircle size={26} className="text-red-400" /> Known Triggers *
               </h3>
               <div className="flex gap-3 mb-6">
-                <input type="text" value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('triggers', newTrigger, setNewTrigger)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none" placeholder="e.g. Late for work" />
+                <input type="text" value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('triggers', newTrigger, setNewTrigger)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none" placeholder="e.g. Late for work" />
                 <button type="button" onClick={() => addTag('triggers', newTrigger, setNewTrigger)} className="bg-red-500/20 px-6 rounded-xl font-bold text-red-200">+</button>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -364,7 +395,8 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[#171140] via-[#171140]/90 to-transparent z-50">
+      {/* FOOTER NAVIGATION */}
+<div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[var(--nura-bg)] via-[var(--nura-bg)]/90 to-transparent z-50">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
           {error && (
             <div className="w-full bg-red-500/20 border border-red-500/50 text-red-100 px-6 py-4 rounded-2xl flex items-center gap-3 animate-pulse">
@@ -373,14 +405,14 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
             </div>
           )}
           <div className="flex gap-4 w-full">
-            <button type="button" onClick={onBack} className="px-8 py-5 rounded-[1.5rem] bg-white/5 text-white/50 font-bold border border-white/10 hover:bg-white/10 transition-all">Cancel</button>
+            <button type="button" onClick={onBack} className="px-8 py-5 rounded-[1.5rem] bg-[var(--nura-card)] text-[var(--nura-text)]/50 font-bold border border-white/10 hover:bg-nura-accent/20 transition-all">Cancel</button>
             {currentStep > 0 && (
-              <button type="button" onClick={handleBackStep} className="px-8 py-5 rounded-[1.5rem] bg-white/10 text-white font-bold border border-white/10 hover:bg-white/20 transition-all"><ArrowLeft size={24} /></button>
+              <button type="button" onClick={handleBackStep} className="px-8 py-5 rounded-[1.5rem] bg-nura-card text-[var(--nura-text)] font-bold border border-white/10 hover:bg-transparent/20 transition-all"><ArrowLeft size={24} /></button>
             )}
             <button 
               onClick={currentStep < STEPS.length - 1 ? handleNext : handleFinalSave} 
               disabled={isLoading} 
-              className="flex-1 bg-white text-[#171140] text-xl font-black py-5 rounded-[1.5rem] shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
+              className="flex-1 bg-transparent text-[#171140] text-xl font-black py-5 rounded-[1.5rem] shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {isLoading ? "Saving..." : currentStep < STEPS.length - 1 ? "Next" : "Save Companion Settings"}
               {!isLoading && (currentStep < STEPS.length - 1 ? <ArrowRight size={24} /> : <CheckCircle2 size={24} />)}

@@ -43,4 +43,10 @@ export interface SessionLog {
 }
 
 // types.ts
-export type ViewState = 'LOGIN' | 'ROLE_SELECTION' | 'DASHBOARD' | 'PATIENT_DETAIL' | 'CONFIG' | 'CHAT' | 'LOGS' | 'PATIENT_PICKER';
+export type ViewState = 'LOGIN' | 'ROLE_SELECTION' | 'DASHBOARD' | 'PATIENT_DETAIL' | 'CONFIG' | 'CHAT' | 'LOGS' | 'PATIENT_PICKER' | 'SETTINGS';
+
+export interface AppSettings {
+  fontSize: 'small' | 'medium' | 'large';
+  colorPalette: 'deep-space' | 'serene-nature' | 'high-clarity' | 'twilight';
+  reducedMotion: boolean;
+}

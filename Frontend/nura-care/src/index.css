@@ -1,68 +1,80 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* 1. THEME DEFINITIONS (The Brain) */
+:root, .theme-deep-space {
+  --nura-bg: #171140 !important;
+  --nura-card: rgba(255, 255, 255, 0.05) !important;
+  --nura-accent: #715ffa !important;
+  --nura-text: #ffffff !important;
+  --nura-dim: rgba(172, 203, 255, 0.6) !important;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* --- SERENE NATURE (Mint/Earth Tones) --- */
+.theme-serene-nature {
+  --nura-bg: #cbdad5 !important; 
+  --nura-card: #ffffff !important; 
+  --nura-accent: #065a60 !important; 
+  --nura-text: #1a1c1c !important; 
+  --nura-dim: #3d4545 !important;
 }
 
-body {
+/* --- TWILIGHT (Purple/Sunset) --- */
+.theme-twilight {
+  --nura-bg: #F3E5F5 !important;     /* Very pale lavender */
+  --nura-card: #FFFFFF !important;   /* Solid white for sharp edges */
+  --nura-accent: #7B1FA2 !important; /* Rich deep purple */
+  --nura-text: #2D1B33 !important;   /* Deep Plum - very dark for text */
+  --nura-dim: #6A1B9A !important;    /* Mid-tone purple */
+}
+
+/* --- HIGH-CLARITY (True Contrast) --- */
+.theme-high-clarity {
+  --nura-bg: #000000 !important;
+  --nura-card: #1A202C !important;
+  --nura-accent: #f1bd00 !important; /* High-viz Green */
+  --nura-text: #c9c0c0 !important;
+  --nura-dim: #B0BEC5 !important;
+}
+
+/* 2. GLOBAL APPLICATION (The Muscles) */
+html, body, #root, main {
+  background-color: var(--nura-bg) !important;
+  color: var(--nura-text) !important;
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  padding: 0;
   min-height: 100vh;
+  transition: background-color 0.5s ease, color 0.5s ease;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* 3. COMPONENT HELPERS */
+/* Targets cards using the Tailwind arbitrary syntax */
+[class*="bg-[var(--nura-card)]"] {
+  background-color: var(--nura-card) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+/* --- ACCESSIBILITY & SCROLLBAR --- */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.reduced-motion * {
+  animation: none !important;
+  transition: none !important;
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--nura-bg); }
+::-webkit-scrollbar-thumb { 
+  background: var(--nura-card); 
+  border-radius: 10px; 
+  border: 2px solid var(--nura-bg); 
+}
+
+[class*="text-indigo-"], [class*="text-purple-"] {
+  color: var(--nura-text) !important;
+}
+
+/* This fixes the icons (Lucide icons use 'stroke') */
+[class*="text-indigo-"] path, [class*="text-purple-"] path {
+  stroke: var(--nura-accent) !important;
 }

@@ -62,19 +62,19 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="glass-panel p-8 rounded-3xl w-full max-w-md flex flex-col gap-4 border-white/10 shadow-2xl relative animate-in zoom-in duration-300">
+      <div className="bg-[var(--nura-card)] p-8 rounded-3xl w-full max-w-md flex flex-col gap-4 border-white/10 shadow-2xl relative animate-in zoom-in duration-300">
         
         {/* Success View */}
         {isSuccess ? (
           <div className="flex flex-col items-center py-6 text-center animate-in fade-in zoom-in duration-500">
             <CheckCircle size={64} className="text-green-400 mb-4" />
-            <h2 className="text-3xl font-bold text-white mb-2">Account Successfully Created</h2>
+            <h2 className="text-3xl font-bold text-[var(--nura-text)] mb-2">Account Successfully Created</h2>
             <p className="text-indigo-200 mb-8 text-sm">
               Your caregiver profile is ready. You can now login and start your personalized care journey with Nura Care.
             </p>
             <button 
               onClick={handleClose}
-              className="w-full bg-[#715ffa] hover:bg-[#8475ff] text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95"
+              className="w-full bg-[var(--nura-accent)] hover:bg-[#8475ff] text-[var(--nura-text)] font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95"
             >
               Log In
             </button>
@@ -84,12 +84,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose })
           <>
             <button 
               onClick={handleClose}
-              className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-[var(--nura-text)]/50 hover:text-[var(--nura-text)] transition-colors"
             >
               <X size={24} />
             </button>
 
-            <h2 className="text-3xl font-bold text-white mb-2">Join Nura Care</h2>
+            <h2 className="text-3xl font-bold text-[var(--nura-text)] mb-2">Join Nura Care</h2>
             <p className="text-indigo-200 mb-4 text-sm">Create an account to start your personalized care journey.</p>
 
             {error && (
@@ -103,7 +103,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose })
               placeholder="Full Name" 
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400 transition-colors"
+              className="bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-indigo-400 transition-colors"
             />
 
             <input 
@@ -111,7 +111,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose })
               placeholder="Email Address" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400 transition-colors"
+              className="bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-indigo-400 transition-colors"
             />
             
             <input 
@@ -119,13 +119,13 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose })
               placeholder="Create Password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-indigo-400 transition-colors"
+              className="bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-indigo-400 transition-colors"
             />
 
             <button 
               onClick={handleCreateAccount}
               disabled={isLoading}
-              className="mt-4 bg-[#715ffa] hover:bg-[#8475ff] text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+              className="mt-4 bg-[var(--nura-accent)] hover:bg-[#8475ff] text-[var(--nura-text)] font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
             >
               {isLoading ? "Creating..." : "Create Account"}
             </button>

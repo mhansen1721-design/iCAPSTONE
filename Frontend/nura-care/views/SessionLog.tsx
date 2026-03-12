@@ -94,12 +94,12 @@ export const SessionLogs: React.FC<SessionLogsProps> = ({ logs = [], onBack, isS
         <header className="mb-8 mt-4 flex items-center justify-between border-b border-white/5 pb-4 relative">
           <button 
             onClick={onBack}
-            className="p-2 hover:bg-white/10 rounded-full transition-all active:scale-90 glass-panel border-white/10 shadow-lg shadow-indigo-500/10"
+            className="p-2 hover:bg-nura-accent/20 rounded-full transition-all active:scale-90 bg-[var(--nura-card)] border-white/10 shadow-lg shadow-indigo-500/10"
           >
             <ChevronLeft size={24} className="text-indigo-200" />
           </button>
           <div className="flex-1 text-center">
-            <h1 className="text-3xl font-extrabold mb-1 tracking-tight text-white">Session Logs</h1>
+            <h1 className="text-3xl font-extrabold mb-1 tracking-tight text-[var(--nura-text)]">Session Logs</h1>
             <p className="text-indigo-200/90 text-base font-medium">Review patient interaction transcripts</p>
           </div>
           <div className="w-[42px]" />
@@ -113,10 +113,10 @@ export const SessionLogs: React.FC<SessionLogsProps> = ({ logs = [], onBack, isS
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search transcripts, keywords, or patient names..."
-          className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-white focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition-all placeholder:text-white/20"
+          className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-[var(--nura-text)] focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition-all placeholder:text-[var(--nura-text)]/20"
         />
         {searchQuery && (
-          <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-white transition-colors">
+          <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-[var(--nura-text)] transition-colors">
             <X size={20} />
           </button>
         )}
@@ -124,8 +124,8 @@ export const SessionLogs: React.FC<SessionLogsProps> = ({ logs = [], onBack, isS
 
       <div className="space-y-10">
         {groupedLogs.length === 0 ? (
-          <div className="glass-panel p-12 rounded-3xl text-center border-white/10">
-            <History size={48} className="mx-auto mb-4 text-indigo-300/50" />
+          <div className="bg-[var(--nura-card)] p-12 rounded-3xl text-center border-white/10">
+            <History size={48} className="mx-auto mb-4 text-[var(--nura-dim)]/50" />
             <p className="text-indigo-200 text-lg">No session logs found matching your search.</p>
           </div>
         ) : (
@@ -145,16 +145,16 @@ export const SessionLogs: React.FC<SessionLogsProps> = ({ logs = [], onBack, isS
                   <div 
                     key={log.id} 
                     onClick={() => toggleExpand(log.id)}
-                    className={`glass-panel p-6 rounded-3xl border-white/10 shadow-xl cursor-pointer transition-all duration-300 ${isExpanded ? 'ring-2 ring-indigo-500/30 bg-white/5' : 'hover:bg-white/5'}`}
+                    className={`bg-[var(--nura-card)] p-6 rounded-3xl border-white/10 shadow-xl cursor-pointer transition-all duration-300 ${isExpanded ? 'ring-2 ring-indigo-500/30 bg-[var(--nura-card)]' : 'hover:bg-[var(--nura-card)]'}`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-4 border-b border-white/5">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                          <User size={20} className="text-indigo-300" />
+                          <User size={20} className="text-[var(--nura-dim)]" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-white">{log.patientName || "Unknown Patient"}</h3>
-                          <div className="flex items-center gap-1 text-xs text-indigo-300/70">
+                          <h3 className="font-bold text-[var(--nura-text)]">{log.patientName || "Unknown Patient"}</h3>
+                          <div className="flex items-center gap-1 text-xs text-[var(--nura-dim)]/70">
                             <Calendar size={12} />
                             {displayDate}
                           </div>
@@ -164,7 +164,7 @@ export const SessionLogs: React.FC<SessionLogsProps> = ({ logs = [], onBack, isS
                         <div className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold uppercase tracking-wider">
                           Completed
                         </div>
-                        {isExpanded ? <ChevronUp size={20} className="text-indigo-300" /> : <ChevronDown size={20} className="text-indigo-300" />}
+                        {isExpanded ? <ChevronUp size={20} className="text-[var(--nura-dim)]" /> : <ChevronDown size={20} className="text-[var(--nura-dim)]" />}
                       </div>
                     </div>
                     

@@ -50,9 +50,10 @@
                 "patient_id": "95d6996f-d5b3-491b-8b95-a46f9263bde9",
                 "full_name": "Testing4",
                 "age": 20,
-                "dementia_stage": "Middle Stage (Moderate)",
+                "dementia_stage": "Early Stage (Mild)",
                 "patient_story": "",
                 "hobbies_and_career": "",
+                "avatarType": "axolotl",
                 "key_people": [
                     {
                         "name": "2",
@@ -68,6 +69,31 @@
                     "2",
                     "2",
                     "2"
+                ]
+            },
+            {
+                "patient_id": "P-1773283213",
+                "full_name": "Testing",
+                "age": 12,
+                "dementia_stage": "Middle Stage (Moderate)",
+                "patient_story": "",
+                "hobbies_and_career": "",
+                "avatarType": "panda",
+                "key_people": [
+                    {
+                        "name": "test",
+                        "relation": "test"
+                    }
+                ],
+                "approved_topics": [
+                    "testing",
+                    "yesti",
+                    "trea"
+                ],
+                "known_triggers": [
+                    "tre",
+                    "rgwea",
+                    "graw"
                 ]
             }
         ]
