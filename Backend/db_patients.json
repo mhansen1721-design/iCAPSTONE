@@ -48,12 +48,12 @@
         "patients": [
             {
                 "patient_id": "95d6996f-d5b3-491b-8b95-a46f9263bde9",
-                "full_name": "Testing4",
+                "full_name": "Testing10",
                 "age": 20,
-                "dementia_stage": "Early Stage (Mild)",
+                "dementia_stage": "Middle Stage (Moderate)",
                 "patient_story": "",
                 "hobbies_and_career": "",
-                "avatarType": "axolotl",
+                "avatarType": "jellyfish",
                 "key_people": [
                     {
                         "name": "2",

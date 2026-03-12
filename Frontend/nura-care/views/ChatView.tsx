@@ -179,17 +179,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* HEADER */}
       <header className="p-6 flex justify-between items-center shrink-0">
         <div>
-          <h2 className="font-black text-xl leading-none">{patient.name}</h2>
-          <p className="text-[10px] text-[var(--nura-dim)] font-bold uppercase tracking-widest mt-1">Live Session</p>
         </div>
-        <button onClick={() => setShowExitConfirm(true)} className="px-6 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-black text-[10px] uppercase tracking-tighter">
-          End Session
-        </button>
+        <button 
+    onClick={() => setShowExitConfirm(true)} 
+    className="px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-full font-black text-xs uppercase tracking-widest shadow-lg shadow-red-500/20 transition-all active:scale-95"
+  >
+      End Session
+      </button>
       </header>
 
       {/* BODY - Changed from h-screen/h-1/2 to flex-1 to prevent cutoff */}
       <div className="flex-1 flex flex-col md:flex-row w-full max-w-7xl mx-auto px-8 gap-8 items-center overflow-hidden">
-        
         {/* Chat Side */}
         <div className="flex-1 flex flex-col h-full justify-center min-h-0">
           <div className={`transition-all duration-700 ${messages.length === 0 ? 'py-10' : 'pb-4'}`}>

@@ -4,8 +4,8 @@ import type { PatientProfile, AvatarType } from '../types';
 import { Avatar } from '../components/Avatar';
 import {
   CheckCircle2, User, Brain, X,
-  Users, Briefcase, AlertCircle, ArrowRight, ArrowLeft, AlertTriangle,
-  BookOpen
+  Users, Briefcase, AlertCircle, Check, ArrowLeft, AlertTriangle,
+  BookOpen, Plus
 } from 'lucide-react';
 
 interface ConfigFlowProps {
@@ -13,7 +13,6 @@ interface ConfigFlowProps {
   patient: PatientProfile | null;
   onSave: (patient: PatientProfile) => void;
   onBack: () => void;
-  isSubView?: boolean; 
 }
 
 const EmptyPatient: PatientProfile = {
@@ -33,15 +32,9 @@ const EmptyPatient: PatientProfile = {
 
 const AVATAR_OPTIONS: AvatarType[] = ['panda', 'jellyfish', 'axolotl'];
 
-const STEPS = [
-  { id: 'basics', label: 'Basics' },
-  { id: 'reminiscence', label: 'Reminiscence' },
-  { id: 'safety', label: 'Safety' }
-] as const;
-
 export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient, onSave, onBack }) => {
   const [formData, setFormData] = useState<PatientProfile>(patient || { ...EmptyPatient });
-  const [currentStep, setCurrentStep] = useState<number>(0);
+  const [currentStep, setCurrentStep] = useState<number>(0); // 0: Basics, 1: People & Safety
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -51,8 +44,6 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
   const [newTrigger, setNewTrigger] = useState('');
   const [newTopic, setNewTopic] = useState('');
 
-  const activeSection = STEPS[currentStep].id;
-
   useEffect(() => {
     if (patient) {
       const p = patient as any;
@@ -60,7 +51,7 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
         ...patient,
         patient_id: p.patient_id || p.id || '',
         name: p.full_name || p.name || '',
-        avatarType: p.avatarType || 'jellyfish', // Ensure avatar is loaded
+        avatarType: p.avatarType || 'jellyfish', 
         age: p.age || 0,
         stage: p.dementia_stage || p.stage || DementiaStage.EARLY,
         description: p.patient_story || p.description || '',
@@ -76,13 +67,11 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
 
   const validateStep = (stepIndex: number) => {
     setError(null);
-    const stepId = STEPS[stepIndex].id;
-    if (stepId === 'basics') {
+    if (stepIndex === 0) {
       if (!formData.name?.trim()) return "Full Name is required.";
       if (!formData.age || formData.age <= 0) return "A valid Age is required.";
-    }
-    if (stepId === 'reminiscence' && (formData.familyMembers?.length || 0) < 1) return "Add at least 1 Key Person.";
-    if (stepId === 'safety') {
+    } else if (stepIndex === 1) {
+      if ((formData.familyMembers?.length || 0) < 1) return "Add at least 1 Key Person.";
       if ((formData.safeTopics?.length || 0) < 3) return "Add at least 3 Approved Topics.";
       if ((formData.triggers?.length || 0) < 3) return "Add at least 3 Known Triggers.";
     }
@@ -92,12 +81,7 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
   const handleNext = () => {
     const errorMsg = validateStep(currentStep);
     if (errorMsg) { setError(errorMsg); return; }
-    setCurrentStep(prev => prev + 1);
-  };
-
-  const handleBackStep = () => {
-    setError(null);
-    if (currentStep > 0) setCurrentStep(prev => prev - 1);
+    setCurrentStep(1);
   };
 
   const handleFinalSave = async () => {
@@ -105,9 +89,6 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
     if (errorMsg) { setError(errorMsg); return; }
     
     setIsLoading(true);
-    setError(null);
-
-    // FIXED: Added avatarType to payload so it saves to the backend
     const backendPayload = {
       patient_id: formData.patient_id || null,
       full_name: (formData.name || '').trim(),
@@ -122,272 +103,220 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
     };
 
     try {
-        const response = await fetch(`http://127.0.0.1:8000/patients/save/${encodeURIComponent(caregiverEmail.toLowerCase().trim())}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(backendPayload)
-        });
-        
-        const result = await response.json();
-      
+      const response = await fetch(`http://127.0.0.1:8000/patients/save/${encodeURIComponent(caregiverEmail.toLowerCase().trim())}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(backendPayload)
+      });
+      const result = await response.json();
       if (response.ok && result.success) {
-        onSave({ 
-          ...formData, 
-          patient_id: result.patient_id, 
-          id: result.patient_id 
-        });
+        onSave({ ...formData, patient_id: result.patient_id, id: result.patient_id });
       } else {
-        const msg = Array.isArray(result.detail) ? result.detail[0].msg : result.detail;
-        setError(msg || "Failed to save profile.");
-        setIsLoading(false);
+        setError(result.detail || "Failed to save.");
       }
     } catch (err) {
-      setError("Server connection failed. Is the Python backend running?");
+      setError("Server connection failed.");
+    } finally {
       setIsLoading(false);
     }
   };
 
   const addTag = (field: 'lifestyles' | 'triggers' | 'safeTopics', value: string, setter: (s: string) => void) => {
     if (!value.trim()) return;
-    setFormData(prev => ({ 
-      ...prev, 
-      [field]: [...(prev[field] || []), value.trim()] 
-    }));
+    setFormData(prev => ({ ...prev, [field]: [...(prev[field] || []), value.trim()] }));
     setter('');
   };
 
-  const removeTag = (field: 'lifestyles' | 'triggers' | 'safeTopics', index: number) => {
+  const removeTag = (field: 'lifestyles' | 'triggers' | 'safeTopics' | 'familyMembers', index: number) => {
     setFormData(prev => ({ 
       ...prev, 
-      [field]: (prev[field] || []).filter((_, i) => i !== index) 
+      [field]: (prev[field as keyof PatientProfile] as any[]).filter((_, i) => i !== index) 
     }));
   };
 
   const addFamilyMember = () => {
     if (!famName.trim() || !famRel.trim()) return;
-    const newMember = { name: famName, relation: famRel };
     setFormData(prev => ({ 
       ...prev, 
-      familyMembers: [...(prev.familyMembers || []), newMember] 
+      familyMembers: [...(prev.familyMembers || []), { name: famName, relation: famRel }] 
     }));
     setFamName(''); setFamRel('');
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 animate-in fade-in duration-700 pb-40 text-[var(--nura-text)]">
-      <div className="max-w-3xl mx-auto w-full">
+    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 pb-48 text-[var(--nura-text)]">
+      <div className="max-w-3xl mx-auto w-full space-y-8">
         
-        {activeSection === 'basics' && (
-          <div className="space-y-10 animate-in slide-in-from-right-8 duration-500">
-             {/* AVATAR PICKER */}
+        {/* PAGE 1: BASICS */}
+        {currentStep === 0 && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+             {/* Avatar Selection */}
              <div className="flex justify-center items-end gap-12 w-full max-w-2xl px-8 mx-auto">
               {AVATAR_OPTIONS.map((type) => (
                 <button 
                   key={type} 
                   type="button"
                   onClick={() => setFormData(p => ({...p, avatarType: type}))} 
-                  className={`relative p-6 rounded-[2.5rem] transition-all duration-500 flex flex-col items-center ${formData.avatarType === type ? 'bg-indigo-500/20 scale-110 ring-2 ring-indigo-400' : 'opacity-40 grayscale hover:opacity-100'}`}
+                  className={`relative p-6 rounded-[2.5rem] transition-all duration-500 flex flex-col items-center ${formData.avatarType === type ? 'bg-[var(--nura-accent)]/20 scale-110 ring-2 ring-[var(--nura-accent)]' : 'opacity-40 grayscale hover:opacity-100'}`}
                 >
                   <Avatar size="md" type={type} emotion={formData.avatarType === type ? 'happy' : 'neutral'} />
                   {formData.avatarType === type && (
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-indigo-400 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg">Selected</div>
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[var(--nura-accent)] text-white text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg">Selected</div>
                   )}
                 </button>
               ))}
             </div>
 
-            {/* PERSONAL INFO */}
-            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-6 text-indigo-100 border-b border-white/5 pb-4">
-                <User size={24} className="text-indigo-400" /> Personal Information
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border border-[var(--nura-text)]/10 shadow-xl">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-6">
+                <User size={24} className="text-[var(--nura-accent)]" /> Personal Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="md:col-span-3">
-                  <label className="block text-base font-bold text-[var(--nura-dim)] mb-2">Full Name *</label>
-                  <input 
-                    type="text" 
-                    value={formData.name || ''} 
-                    onChange={(e) => setFormData({...formData, name: e.target.value})} 
-                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:border-indigo-400 outline-none" 
-                  />
+                  <label className="block text-xs font-black text-[var(--nura-dim)] mb-2 uppercase tracking-widest">Full Name *</label>
+                  <input type="text" value={formData.name || ''} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 focus:border-[var(--nura-accent)] outline-none transition-all" />
                 </div>
                 <div>
-                  <label className="block text-base font-bold text-[var(--nura-dim)] mb-2">Age *</label>
-                  <input 
-                    type="number" 
-                    value={formData.age === 0 ? '' : formData.age} 
-                    onChange={(e) => setFormData({...formData, age: parseInt(e.target.value) || 0})} 
-                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:border-indigo-400 outline-none" 
-                    placeholder="0" 
-                  />
+                  <label className="block text-xs font-black text-[var(--nura-dim)] mb-2 uppercase tracking-widest">Age *</label>
+                  <input type="number" value={formData.age === 0 ? '' : formData.age} onChange={(e) => setFormData({...formData, age: parseInt(e.target.value) || 0})} className="w-full bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 focus:border-[var(--nura-accent)] outline-none" />
                 </div>
               </div>
-            </div>
 
-               <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-l-8 border-l-purple-500/50 border-white/10 shadow-xl">
-                      <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
-                          <Brain size={24} className="text-purple-400" /> Dementia Stage <span className="text-red-400">*</span>
-                      </h3>
-                      <p className="text-base text-indigo-200/80 mb-6">Helping the AI adjust conversational complexity and tone.</p>
-                      
-                      <div className="grid grid-cols-1 gap-4">
-                        {[
-                          {
-                            value: DementiaStage.EARLY,
-                            title: "Mild",
-                            desc: "They are mostly independent but have occasional memory lapses"
-                          },
-                          {
-                            value: DementiaStage.MIDDLE,
-                            title: "Moderate",
-                            desc: "They sometimes get confused about time or place, or struggle to find the right words"
-                          },
-                          {
-                            value: DementiaStage.LATE,
-                            title: "Severe",
-                            desc: "Verbal communication is difficult, and they respond best to music, touch, or visual cues"
-                          }
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            onClick={() => { setFormData(prev => ({ ...prev, stage: option.value as DementiaStage, aiSuggestionsLoaded: false })); setError(null); }}
-                            className={`p-5 rounded-2xl border text-left transition-all flex flex-col gap-2 relative overflow-hidden group ${
-                              formData.stage === option.value
-                                ? 'bg-indigo-500/20 border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.15)]'
-                                : 'bg-black/20 border-white/10 hover:bg-[var(--nura-card)] hover:border-white/30'
-                            }`}
-                          >
-                            <div className={`font-bold text-lg flex items-center justify-between ${formData.stage === option.value ? 'text-[var(--nura-dim)]' : 'text-[var(--nura-text)]'}`}>
-                              {option.title}
-                              {formData.stage === option.value && <CheckCircle2 size={20} className="text-indigo-400" />}
-                            </div>
-                            <p className="text-base text-indigo-200/70 leading-relaxed font-medium">
-                              {option.desc}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                  </div>
-              </div>
-          )}
-
-        {activeSection === 'reminiscence' && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 duration-500">
-            {/* STORY */}
-            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 border-b border-white/5 pb-4">
-                <BookOpen size={24} className="text-cyan-400" /> Patient Story
-              </h3>
-              <textarea 
-                value={formData.description || ''} 
-                onChange={(e) => setFormData({...formData, description: e.target.value})} 
-                className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] min-h-[120px] focus:border-indigo-400 outline-none" 
-                placeholder="Describe their life, personality, or important memories..." 
-              />
-            </div>
-
-            {/* HOBBIES */}
-            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 border-t-8 border-t-amber-500/50">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-indigo-100 pb-4">
-                <Briefcase size={24} className="text-amber-400" /> Hobbies & Career
-              </h3>
-              <div className="flex gap-3 mb-6">
-                <input 
-                  type="text" 
-                  value={newLifestyle} 
-                  onChange={(e) => setNewLifestyle(e.target.value)} 
-                  onKeyDown={(e) => e.key === 'Enter' && addTag('lifestyles', newLifestyle, setNewLifestyle)} 
-                  className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none" 
-                  placeholder="e.g. Piano Teacher, Gardening" 
+              <div className="mb-8">
+                <label className="block text-xs font-black text-[var(--nura-dim)] mb-2 uppercase flex items-center gap-2">
+                  <BookOpen size={14}/> Patient Story
+                </label>
+                <textarea 
+                  value={formData.description || ''} 
+                  onChange={(e) => setFormData({...formData, description: e.target.value})} 
+                  placeholder="Describe their personality and background..."
+                  className="w-full bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 h-32 focus:border-[var(--nura-accent)] outline-none resize-none" 
                 />
-                <button 
-                  type="button" 
-                  onClick={() => addTag('lifestyles', newLifestyle, setNewLifestyle)} 
-                  className="bg-indigo-500 px-6 rounded-xl font-bold text-[var(--nura-text)]"
-                >
-                  +
-                </button>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {(formData.lifestyles || []).map((tag, idx) => (
-                  <span key={idx} className="bg-amber-500/10 border border-amber-500/20 text-amber-100 px-4 py-2 rounded-xl flex items-center gap-3">
-                    {tag}
-                    <button type="button" onClick={() => removeTag('lifestyles', idx)}><X size={14}/></button>
-                  </span>
-                ))}
+
+              <div>
+                <label className="block text-xs font-black text-[var(--nura-dim)] mb-2 uppercase flex items-center gap-2">
+                  <Briefcase size={14}/> Hobbies & Career
+                </label>
+                <div className="flex gap-3 mb-4">
+                  <input type="text" value={newLifestyle} onChange={(e) => setNewLifestyle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('lifestyles', newLifestyle, setNewLifestyle)} className="flex-1 bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 outline-none" placeholder="e.g. Architect" />
+                  <button onClick={() => addTag('lifestyles', newLifestyle, setNewLifestyle)} className="bg-[var(--nura-accent)] text-white px-6 rounded-xl"><Plus size={24}/></button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(formData.lifestyles || []).map((tag, idx) => (
+                    <div key={idx} className="bg-[var(--nura-accent)]/10 border border-[var(--nura-accent)]/30 px-4 py-2 rounded-full flex items-center gap-2">
+                      <span className="text-sm font-bold">{tag}</span>
+                      <button onClick={() => removeTag('lifestyles', idx)} className="text-[var(--nura-dim)] hover:text-red-500"><X size={14}/></button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* KEY PEOPLE */}
-            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-white/10 border-t-8 border-t-pink-500/50">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
-                <Users size={24} className="text-pink-400" /> Key People *
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border border-[var(--nura-text)]/10 shadow-xl">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-4">
+                <Brain size={24} className="text-[var(--nura-accent)]" /> Dementia Stage *
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {(formData.familyMembers || []).map((member, idx) => (
-                  <div key={idx} className="bg-[var(--nura-card)] border border-white/10 rounded-2xl p-4 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-[var(--nura-text)]">{member.name}</h4>
-                      <p className="text-sm text-[var(--nura-dim)]">{member.relation}</p>
+              <div className="space-y-4">
+                {[
+                  { value: DementiaStage.EARLY, title: "Mild", desc: "Mostly independent but has occasional memory lapses" },
+                  { value: DementiaStage.MIDDLE, title: "Moderate", desc: "Struggles to find words or gets confused about time" },
+                  { value: DementiaStage.LATE, title: "Severe", desc: "Communication is difficult; responds best to music or touch" }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setFormData(prev => ({ ...prev, stage: option.value as DementiaStage }))}
+                    className={`w-full p-6 rounded-2xl border-2 text-left transition-all ${
+                      formData.stage === option.value ? 'bg-[var(--nura-accent)] border-[var(--nura-accent)] text-white' : 'bg-[var(--nura-bg)]/30 border-[var(--nura-text)]/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-black text-lg">{option.title}</span>
+                      {formData.stage === option.value && <CheckCircle2 size={20} />}
                     </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setFormData(p => ({...p, familyMembers: (p.familyMembers || []).filter((_, i) => i !== idx)}))}
-                    >
-                      <X size={18} className="text-red-300" />
-                    </button>
-                  </div>
+                    <p className={`text-sm font-medium ${formData.stage === option.value ? 'opacity-90' : 'text-[var(--nura-dim)]'}`}>{option.desc}</p>
+                  </button>
                 ))}
-              </div>
-              <div className="bg-black/20 rounded-2xl p-5 border border-white/5 flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="text" value={famName} onChange={(e) => setFamName(e.target.value)} placeholder="Name" className="bg-black/20 border border-white/10 rounded-xl p-3 text-[var(--nura-text)]" />
-                  <input type="text" value={famRel} onChange={(e) => setFamRel(e.target.value)} placeholder="Relation" className="bg-black/20 border border-white/10 rounded-xl p-3 text-[var(--nura-text)]" />
-                </div>
-                <button type="button" onClick={addFamilyMember} className="bg-pink-500/80 hover:bg-pink-500 text-[var(--nura-text)] py-3 rounded-xl font-bold transition-colors">
-                  Add Person
-                </button>
               </div>
             </div>
           </div>
         )}
 
-        {activeSection === 'safety' && (
-          <div className="space-y-8 animate-in slide-in-from-right-8 duration-500">
-            {/* TOPICS */}
-            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-t-8 border-t-green-500/50 border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
-                <CheckCircle2 size={26} className="text-green-400" /> Approved Topics *
+        {/* PAGE 2: PEOPLE & SAFETY */}
+        {currentStep === 1 && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+            {/* Key People */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border border-[var(--nura-text)]/10 shadow-xl">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-2">
+                <Users size={24} className="text-pink-500" /> Key People *
               </h3>
-              <div className="flex gap-3 mb-6">
-                <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('safeTopics', newTopic, setNewTopic)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none" placeholder="e.g. Classical Music" />
-                <button type="button" onClick={() => addTag('safeTopics', newTopic, setNewTopic)} className="bg-green-500/20 px-6 rounded-xl font-bold text-green-200">+</button>
+              <p className="text-[var(--nura-dim)] text-sm mb-6 leading-relaxed">Add close family or friends who visit frequently.</p>
+              
+              <div className="bg-[var(--nura-bg)]/50 rounded-2xl p-6 border border-[var(--nura-text)]/10 mb-8">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <input type="text" value={famName} onChange={(e) => setFamName(e.target.value)} placeholder="Name" className="bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 focus:border-pink-500 outline-none" />
+                  <input type="text" value={famRel} onChange={(e) => setFamRel(e.target.value)} placeholder="Relation" className="bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 focus:border-pink-500 outline-none" />
+                </div>
+                <button onClick={addFamilyMember} className="w-full bg-pink-500 hover:bg-pink-600 text-white py-4 rounded-xl font-black transition-all shadow-md">Add Person</button>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {(formData.safeTopics || []).map((tag, idx) => (
-                  <span key={idx} className="bg-green-500/10 border border-green-500/20 text-green-100 px-4 py-2 rounded-xl flex items-center gap-3">
-                    {tag}
-                    <button type="button" onClick={() => removeTag('safeTopics', idx)}><X size={14}/></button>
-                  </span>
+
+              <div className="space-y-3">
+                {(formData.familyMembers || []).map((member, idx) => (
+                  <div key={idx} className="bg-[var(--nura-bg)]/30 border border-[var(--nura-text)]/10 rounded-2xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500"><User size={20} /></div>
+                      <div>
+                        <p className="font-black text-lg leading-tight">{member.name}</p>
+                        <p className="text-xs font-bold text-[var(--nura-dim)] uppercase tracking-tighter">{member.relation}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => removeTag('familyMembers', idx)} className="text-[var(--nura-dim)] hover:text-red-500"><X size={20}/></button>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* TRIGGERS */}
-            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border-t-8 border-t-red-500/50 border-white/10 shadow-xl">
-              <h3 className="flex items-center gap-3 text-xl font-bold mb-3 text-indigo-100">
-                <AlertCircle size={26} className="text-red-400" /> Known Triggers *
+            {/* Approved Topics */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border border-[var(--nura-text)]/10 shadow-xl">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-2 text-green-500">
+                <CheckCircle2 size={24} /> Approved Topics *
               </h3>
+              <p className="text-[var(--nura-dim)] text-sm mb-6 leading-relaxed">
+                Safe, positive subjects that help ground the patient (e.g., childhood pets, classical music).
+              </p>
               <div className="flex gap-3 mb-6">
-                <input type="text" value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag('triggers', newTrigger, setNewTrigger)} className="flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none" placeholder="e.g. Late for work" />
-                <button type="button" onClick={() => addTag('triggers', newTrigger, setNewTrigger)} className="bg-red-500/20 px-6 rounded-xl font-bold text-red-200">+</button>
+                <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} placeholder="Add a safe topic..." className="flex-1 bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 outline-none focus:border-green-500" />
+                <button onClick={() => addTag('safeTopics', newTopic, setNewTopic)} className="bg-green-500 text-white p-4 rounded-xl shadow-lg"><Plus size={24}/></button>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2">
+                {(formData.safeTopics || []).map((tag, idx) => (
+                  <div key={idx} className="bg-green-500/10 border border-green-500/20 px-4 py-2 rounded-xl flex items-center gap-2">
+                    <span className="font-bold text-sm">{tag}</span>
+                    <button onClick={() => removeTag('safeTopics', idx)} className="text-green-600 hover:text-red-500"><X size={16}/></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Known Triggers */}
+            <div className="bg-[var(--nura-card)] p-8 rounded-[2rem] border border-[var(--nura-text)]/10 shadow-xl">
+              <h3 className="flex items-center gap-3 text-xl font-bold mb-2 text-red-500">
+                <AlertCircle size={24} /> Known Triggers *
+              </h3>
+              <p className="text-[var(--nura-dim)] text-sm mb-6 leading-relaxed">
+                Identify topics or situations that may cause distress or confusion.
+              </p>
+              <div className="flex gap-3 mb-6">
+                <input type="text" value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)} placeholder="Add a trigger..." className="flex-1 bg-transparent border-2 border-[var(--nura-text)]/20 rounded-xl p-4 outline-none focus:border-red-500" />
+                <button onClick={() => addTag('triggers', newTrigger, setNewTrigger)} className="bg-red-500 text-white p-4 rounded-xl shadow-lg"><Plus size={24}/></button>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {(formData.triggers || []).map((tag, idx) => (
-                  <span key={idx} className="bg-red-500/10 border border-red-500/20 text-red-100 px-4 py-2 rounded-xl flex items-center gap-3">
-                    {tag}
-                    <button type="button" onClick={() => removeTag('triggers', idx)}><X size={14}/></button>
-                  </span>
+                  <div key={idx} className="bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-xl flex items-center gap-2">
+                    <span className="font-bold text-sm">{tag}</span>
+                    <button onClick={() => removeTag('triggers', idx)} className="text-red-600 hover:text-red-800"><X size={16}/></button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -395,27 +324,25 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
         )}
       </div>
 
-      {/* FOOTER NAVIGATION */}
-<div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[var(--nura-bg)] via-[var(--nura-bg)]/90 to-transparent z-50">
+      {/* FOOTER */}
+      <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[var(--nura-bg)] via-[var(--nura-bg)] to-transparent z-50">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
           {error && (
-            <div className="w-full bg-red-500/20 border border-red-500/50 text-red-100 px-6 py-4 rounded-2xl flex items-center gap-3 animate-pulse">
-              <AlertTriangle size={24} className="text-red-400 shrink-0" />
-              <p className="font-bold">{error}</p>
+            <div className="bg-red-500/20 border border-red-500/50 text-red-100 p-4 rounded-2xl flex items-center gap-3 animate-bounce">
+              <AlertTriangle size={20} className="text-red-500" />
+              <p className="font-bold text-sm">{error}</p>
             </div>
           )}
-          <div className="flex gap-4 w-full">
-            <button type="button" onClick={onBack} className="px-8 py-5 rounded-[1.5rem] bg-[var(--nura-card)] text-[var(--nura-text)]/50 font-bold border border-white/10 hover:bg-nura-accent/20 transition-all">Cancel</button>
-            {currentStep > 0 && (
-              <button type="button" onClick={handleBackStep} className="px-8 py-5 rounded-[1.5rem] bg-nura-card text-[var(--nura-text)] font-bold border border-white/10 hover:bg-transparent/20 transition-all"><ArrowLeft size={24} /></button>
-            )}
+          <div className="flex gap-4">
+            <button onClick={onBack} className="px-8 py-5 rounded-2xl bg-[var(--nura-card)] text-[var(--nura-text)] font-bold border border-[var(--nura-text)]/10">Cancel</button>
+            {currentStep === 1 && <button onClick={() => setCurrentStep(0)} className="px-8 py-5 rounded-2xl bg-[var(--nura-card)] text-[var(--nura-text)] font-bold border border-[var(--nura-text)]/10"><ArrowLeft size={24}/></button>}
             <button 
-              onClick={currentStep < STEPS.length - 1 ? handleNext : handleFinalSave} 
-              disabled={isLoading} 
-              className="flex-1 bg-transparent text-[#171140] text-xl font-black py-5 rounded-[1.5rem] shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
+              onClick={currentStep === 0 ? handleNext : handleFinalSave} 
+              disabled={isLoading}
+              className="flex-1 bg-[var(--nura-text)] text-[var(--nura-bg)] text-xl font-black py-5 rounded-2xl shadow-2xl flex items-center justify-center gap-3 transition-transform active:scale-95"
             >
-              {isLoading ? "Saving..." : currentStep < STEPS.length - 1 ? "Next" : "Save Companion Settings"}
-              {!isLoading && (currentStep < STEPS.length - 1 ? <ArrowRight size={24} /> : <CheckCircle2 size={24} />)}
+              {isLoading ? "Saving..." : currentStep === 0 ? "Next" : "Save Settings"}
+              {!isLoading && (currentStep === 0 ? <Check size={24} /> : <CheckCircle2 size={24} />)}
             </button>
           </div>
         </div>

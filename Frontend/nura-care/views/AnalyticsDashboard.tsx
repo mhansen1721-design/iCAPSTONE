@@ -73,13 +73,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-indigo-950/90 border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-md">
-        <p className="text-[var(--nura-dim)] text-xs font-bold uppercase tracking-wider mb-2">{label}</p>
+      <div className="bg-[var(--nura-bg)] border border-white/20 p-4 rounded-2xl shadow-2xl backdrop-blur-md">
+        <p className="text-[var(--nura-dim)] text-[10px] font-black uppercase tracking-widest mb-2">{label}</p>
         <div className="flex items-center gap-3">
           <span className="text-3xl">{data.emoji}</span>
           <div>
-            <p className="text-[var(--nura-text)] font-black text-lg">{data.emotion}</p>
-            <p className="text-indigo-200/60 text-xs">Score: {data.score}%</p>
+            <p className="text-[var(--nura-text)] font-black text-lg leading-none mb-1">{data.emotion}</p>
+            <p className="text-[var(--nura-accent)] font-bold text-xs uppercase">Score: {data.score}%</p>
           </div>
         </div>
       </div>
@@ -121,20 +121,24 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ patient,
   return (
     <div className="space-y-8 pb-20">
       {/* A. Urgent Notifications */}
-      <section className="bg-[var(--nura-card)] p-6 rounded-3xl border-red-500/20 bg-red-500/5">
-        <h3 className="flex items-center gap-3 text-xl font-bold mb-4 text-red-200">
-          <AlertCircle className="text-red-400" /> Urgent Notifications
-        </h3>
-        <div className="space-y-3">
-          <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3">
-            <AlertCircle size={20} className="text-red-400 mt-1 shrink-0" />
-            <div>
-              <p className="font-bold text-red-100">No critical health alerts detected this week.</p>
-              <p className="text-sm text-red-200/70">System monitored for signs of distress, self-harm, or medical emergencies.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+<section className="bg-red-500/10 p-6 rounded-3xl border border-red-500/30">
+  <h3 className="flex items-center gap-3 text-xl font-black mb-4 text-red-500">
+    <AlertCircle className="text-red-500" /> Urgent Notifications
+  </h3>
+  <div className="space-y-3">
+    <div className="bg-white/5 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3">
+      <AlertCircle size={20} className="text-red-500 mt-1 shrink-0" />
+      <div>
+        {/* Use var(--nura-text) or a solid red for the headline */}
+        <p className="font-black text-[var(--nura-text)] text-lg">No critical health alerts detected.</p>
+        <p className="text-sm font-medium text-[var(--nura-dim)] leading-relaxed">
+          The system monitored for signs of distress, self-harm, or medical emergencies. 
+          Everything appears stable this week.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* B. Emotion Log Dashboard */}
