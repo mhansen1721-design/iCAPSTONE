@@ -1,10 +1,10 @@
 /* 1. THEME DEFINITIONS (The Brain) */
-:root, .theme-deep-space {
-  --nura-bg: #171140 !important;
-  --nura-card: rgba(255, 255, 255, 0.05) !important;
-  --nura-accent: #715ffa !important;
-  --nura-text: #ffffff !important;
-  --nura-dim: rgba(172, 203, 255, 0.6) !important;
+:root {
+  --nura-bg: #E3D5FF !important;     /* Very pale lavender */
+  --nura-card: #FFFFFF !important;   
+  --nura-accent: #6231C6 !important; 
+  --nura-text: #2D1B33 !important;   
+  --nura-dim: #6A1B9A !important;    
 }
 
 /* --- SERENE NATURE (Mint/Earth Tones) --- */
@@ -17,12 +17,12 @@
 }
 
 /* --- TWILIGHT (Purple/Sunset) --- */
-.theme-twilight {
-  --nura-bg: #E3D5FF!important;     /* Very pale lavender */
-  --nura-card: #FFFFFF !important;   /* Solid white for sharp edges */
-  --nura-accent: #6231C6!important; /* Rich deep purple */
-  --nura-text: #2D1B33 !important;   /* Deep Plum - very dark for text */
-  --nura-dim: #6A1B9A !important;    /* Mid-tone purple */
+.theme-deep-space {
+  --nura-bg: #171140 !important;
+  --nura-card: rgba(255, 255, 255, 0.05) !important;
+  --nura-accent: #715ffa !important;
+  --nura-text: #ffffff !important;
+  --nura-dim: rgba(172, 203, 255, 0.6) !important;
 }
 
 /* --- HIGH-CLARITY (True Contrast) --- */
@@ -32,6 +32,14 @@
   --nura-accent: #f1bd00 !important; /* High-viz Green */
   --nura-text: #c9c0c0 !important;
   --nura-dim: #B0BEC5 !important;
+}
+
+.theme-twilight {
+  --nura-bg: #E3D5FF !important;
+  --nura-card: #FFFFFF !important;
+  --nura-accent: #6231C6 !important;
+  --nura-text: #2D1B33 !important;
+  --nura-dim: #6A1B9A !important;
 }
 
 /* 2. GLOBAL APPLICATION (The Muscles) */

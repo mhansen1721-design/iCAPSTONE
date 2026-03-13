@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Avatar } from '../components/Avatar';
-import { RegisterModal } from '../views/Register'; 
+import { RegisterModal } from '../views/Register';
 
 interface LoginProps {
-  // FIXED: Now expects both email and password
   onLogin: (email: string, password: string) => void;
 }
 
@@ -14,111 +13,100 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 
+  useEffect(() => {
+    if (error) setError(null);
+  }, [email, password]);
+
   const handleManualLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
     if (!email.trim() || !password.trim()) {
       setError("Please enter both email and password.");
       return;
     }
-
     setIsLoading(true);
     setError(null);
 
     try {
       const url = `http://127.0.0.1:8000/login?email=${encodeURIComponent(email.trim())}&password=${encodeURIComponent(password)}`;
-      const response = await fetch(url, { 
-        method: "POST", 
-        headers: { "Accept": "application/json" } 
-      });
-      
+      const response = await fetch(url, { method: "POST" });
       const data = await response.json();
 
       if (response.ok && data.success === true) {
-        // FIXED: Passing both credentials to the parent App
         onLogin(email.toLowerCase().trim(), password); 
       } else {
-        setError(data.message || "Invalid email or password");
+        setError(data.detail || data.message || "Invalid email or password");
       }
     } catch (err) {
-      console.error("Login Error:", err);
-      setError("Connection failed. Is the backend running?");
+      setError("Connection failed. Check backend.");
     } finally {
       setIsLoading(false);
     }
   };
 
-return (
-  <div className="flex flex-col items-center justify-center min-h-screen p-6 animate-in fade-in zoom-in duration-1000">
-    <RegisterModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} />
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-white text-black animate-in fade-in duration-700">
+      <RegisterModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} />
 
-    <div className="mb-8">
-      <Avatar size="xl" emotion={isLoading ? "neutral" : "happy"} />
+      <div className="mb-8">
+        <Avatar size="xl" emotion={isLoading ? "neutral" : (error ? "sad" : "happy")} />
+      </div>
+      
+      <h1 className="text-5xl font-black mb-2 text-center tracking-tighter uppercase">
+        Nura Care
+      </h1>
+      
+      <p className="text-gray-500 text-center mb-10 text-lg font-medium">
+        Compassionate AI companionship.
+      </p>
+
+      {/* --- CARD --- */}
+      <div className="w-full max-w-sm p-8 rounded-3xl bg-gray-50 border border-gray-200 shadow-sm">
+        <form onSubmit={handleManualLogin} className="flex flex-col gap-5">
+          
+          {error && (
+            <div className="bg-black text-white p-3 rounded-xl text-center text-xs font-bold uppercase tracking-widest animate-bounce">
+              {error}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3">
+            <label className="text-[10px] font-black uppercase ml-1 text-gray-400">Credentials</label>
+            <input 
+              type="email" 
+              placeholder="Email Address" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-xl p-4 text-black focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all placeholder:text-gray-300"
+              required
+            />
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-xl p-4 text-black focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all placeholder:text-gray-300"
+              required
+            />
+          </div>
+          
+          <button 
+            type="submit"
+            disabled={isLoading}
+            className="bg-gray-800 text-white font-bold rounded-xl h-[55px] w-full hover:bg-black active:scale-[0.98] transition-all text-lg uppercase tracking-tight disabled:opacity-20"
+          >
+            {isLoading ? "Checking..." : "Sign In"}
+          </button>
+        </form>
+      </div>
+
+      {/* --- RE-STYLED REGISTER LINK --- */}
+      <button 
+        type="button"
+        onClick={() => setIsRegisterOpen(true)}
+        className="mt-10 text-gray-900 hover:text-black font-black text-base uppercase tracking-widest underline underline-offset-8 decoration-2 decoration-gray-300 hover:decoration-black transition-all"
+      >
+        Need an account? Register Now
+      </button>
     </div>
-    
-    <h1 className="text-5xl font-extrabold mb-4 text-center text-[var(--nura-text)]">
-      Nura Care
-    </h1>
-    
-    <p className="text-[var(--nura-dim)] text-center mb-10 text-lg max-w-md font-medium">
-      Compassionate AI companionship designed for peace of mind.
-    </p>
-
-    {/* --- THE CARD CONTAINER --- */}
-    <div 
-      className="w-full max-w-sm p-8 rounded-[2.5rem] shadow-2xl backdrop-blur-md" 
-      style={{ 
-        /* Try card variable, fallback to dark translucent if empty */
-        backgroundColor: 'var(--nura-card, rgba(255, 255, 255, 0.05))', 
-        border: '1px solid rgba(255,255,255,0.1)' 
-      }}
-    >
-      <form onSubmit={handleManualLogin} className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4">
-          <input 
-            type="email" 
-            placeholder="Caregiver Email" 
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-[var(--nura-accent)] transition-all"
-            required
-          />
-          <input 
-            type="password" 
-            placeholder="Password" 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-[var(--nura-accent)] transition-all"
-            required
-          />
-        </div>
-        
-        {/* --- THE SIGN IN BUTTON (With Fallback) --- */}
-        <button 
-          type="submit"
-          disabled={isLoading}
-          style={{ 
-            /* Try accent variable, fallback to solid purple so it NEVER disappears */
-            backgroundColor: 'var(--nura-accent, #715ffa)', 
-            color: 'white',
-            minHeight: '60px',
-            width: '100%',
-            display: 'block'
-          }}
-          className="font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all text-xl"
-        >
-          {isLoading ? "Connecting..." : "Sign In"}
-        </button>
-      </form>
-    </div>
-
-    <button 
-      type="button"
-      onClick={() => setIsRegisterOpen(true)}
-      className="mt-8 text-[var(--nura-dim)] hover:text-[var(--nura-text)] font-bold transition-all underline underline-offset-8 decoration-2"
-    >
-      Need an account? Register
-    </button>
-  </div>
-);
+  );
 };

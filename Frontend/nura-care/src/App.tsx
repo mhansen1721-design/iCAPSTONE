@@ -12,7 +12,6 @@ import { Settings } from '../views/Settings';
 import { CareCenter } from '../views/CareCenter';
 import type { PatientProfile, SessionLog, AppSettings } from '../types';
 
-// Extend ViewState to include CARE_CENTER
 type ViewState =
   | 'LOGIN'
   | 'ROLE_SELECTION'
@@ -41,19 +40,17 @@ export default function App() {
 
   const [appSettings, setAppSettings] = useState<AppSettings>({
     fontSize: 'medium',
-    colorPalette: 'deep-space',
+    colorPalette: 'twilight',
     reducedMotion: false
   });
 
   // --- THEME SYNC ---
-  // Apply theme to DOM on every settings change
   useEffect(() => {
     const themeClass = `theme-${appSettings.colorPalette}`;
     document.documentElement.className = themeClass;
     document.body.className = themeClass;
   }, [appSettings]);
 
-  // Persist settings under a per-user key so each caregiver has independent preferences
   useEffect(() => {
     if (!caregiverEmail) return;
     const key = `nura-settings:${caregiverEmail.toLowerCase().trim()}`;
@@ -61,8 +58,6 @@ export default function App() {
   }, [appSettings, caregiverEmail]);
 
   // --- 2. DATA FETCHING ---
-
-  // Load patients whenever email or refreshKey changes
   useEffect(() => {
     const fetchPatients = async () => {
       if (!caregiverEmail) return;
@@ -89,15 +84,12 @@ export default function App() {
     fetchPatients();
   }, [caregiverEmail, refreshKey]);
 
-  // Load session logs (new patient-centric structure)
   useEffect(() => {
     const loadLogs = async () => {
       try {
         const res = await fetch('http://127.0.0.1:8000/chat/logs');
         if (!res.ok) return;
         const data = await res.json();
-
-        // New structure: { patient_id: { full_name, sessions: [] } }
         const flattened: SessionLog[] = [];
         Object.keys(data).forEach((patientId) => {
           const entry = data[patientId];
@@ -129,26 +121,18 @@ export default function App() {
     const cleanEmail = email.toLowerCase().trim();
     setCaregiverEmail(cleanEmail);
     if (password) setCaregiverPassword(password);
-
-    // Load this user's saved settings — each caregiver gets their own preferences
     const key = `nura-settings:${cleanEmail}`;
     const saved = localStorage.getItem(key);
     if (saved) {
-      try { setAppSettings(JSON.parse(saved)); } catch { /* ignore corrupt data */ }
+      try { setAppSettings(JSON.parse(saved)); } catch { }
     } else {
-      setAppSettings({ fontSize: 'medium', colorPalette: 'deep-space', reducedMotion: false });
+      setAppSettings({ fontSize: 'medium', colorPalette: 'twilight', reducedMotion: false });
     }
-
     setView('ROLE_SELECTION');
   };
 
-  // Called when user finishes registration — auto-logs them in and optionally joins a circle
   const handleRegisterComplete = async (email: string, password: string, joinCode?: string) => {
-    // Re-use the normal login flow (loads per-user settings etc.)
     handleLogin(email, password);
-
-    // If they entered a join code, join the circle immediately after login
-    // We use a short delay to let the caregiverEmail state settle before the patient fetch fires
     if (joinCode) {
       setTimeout(async () => {
         try {
@@ -157,9 +141,8 @@ export default function App() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email.toLowerCase().trim(), access_code: joinCode.toUpperCase() }),
           });
-          // Trigger patient list refresh so the joined patient appears on Dashboard
           setRefreshKey(k => k + 1);
-        } catch { /* silent — they can always join from Dashboard later */ }
+        } catch { }
       }, 300);
     }
   };
@@ -175,12 +158,18 @@ export default function App() {
     setView(userRole === 'patient' ? 'PATIENT_PICKER' : 'DASHBOARD');
   };
 
-  const handleOpenCareCenter = (patientId: string) => {
-    setCareCenterPatientId(patientId);
+  // Opens CareCenter; if no id supplied, defaults to first patient inside CareCenter
+  const handleOpenCareCenter = (patientId?: string) => {
+    setCareCenterPatientId(patientId || null);
     setView('CARE_CENTER');
   };
 
-  // Called after a caregiver joins a care circle — refresh patients
+  // Opens ConfigFlow directly (no Analytics/Logs tabs)
+  const handleConfigPatient = (id: string) => {
+    setEditingPatientId(id);
+    setView('CONFIG');
+  };
+
   const handleJoinSuccess = () => {
     setRefreshKey((k) => k + 1);
   };
@@ -228,10 +217,11 @@ export default function App() {
             caregiverEmail={caregiverEmail}
             onAddPatient={() => { setEditingPatientId(null); setView('CONFIG'); }}
             onEditPatient={(id) => { setEditingPatientId(id); setView('PATIENT_DETAIL'); }}
+            onConfigPatient={handleConfigPatient}   // ← patient card click → straight to Configure
             onChat={handleStartChat}
             onLogout={() => setView('LOGIN')}
             onViewLogs={() => setView('SETTINGS')}
-            onOpenCareCenter={handleOpenCareCenter}
+            onOpenCareCenter={handleOpenCareCenter} // ← Care Center tile (no id needed)
             onJoinSuccess={handleJoinSuccess}
             setAppPatients={setPatients}
             onDeletePatient={(id) =>

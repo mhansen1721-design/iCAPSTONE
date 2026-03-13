@@ -154,6 +154,12 @@ class ClaimRequest(BaseModel):
     claimer_email: str
 
 
+class ChatRequest(BaseModel):
+    patient_id: str
+    user_input: str
+    chat_history: list = []   # [{"role": "user"|"assistant", "content": str}, …]
+
+
 # ─────────────────────────────────────────────
 # 1. AUTH & REGISTRATION
 # ─────────────────────────────────────────────
@@ -609,6 +615,63 @@ def delete_photo(photo_id: str, email: str):
 # ─────────────────────────────────────────────
 # 8. SESSION LOGGING
 # ─────────────────────────────────────────────
+
+# ── LLM Chat Response ──────────────────────────────────────────────────────────
+@app.post("/chat/respond")
+async def chat_respond(data: ChatRequest):
+    """
+    Receives a patient message + conversation history and returns an LLM-generated
+    companion response via Qwen2.5-3B-Instruct (llm_chat.py).
+
+    Response shape:
+    {
+        "response_text": str,          # AI's spoken reply
+        "ui_signal":     str,          # "NONE" | "REDIRECT" | "ALERT"
+        "log_entry":     str           # Clinical tag for caregiver logs
+    }
+
+    ui_signal == "ALERT" means a Tier-3 emergency was detected — the frontend
+    should surface a prominent caregiver notification immediately.
+    """
+    patients_db = load_json(PATIENTS_FILE)
+    patient     = patients_db.get(data.patient_id, {})
+
+    # Build the patient_info dict that llm_chat.py expects
+    patient_info = {
+        "name":             patient.get("full_name", ""),
+        "companion_figure": "your AI companion Nura",
+        "patient_story":    patient.get("patient_story", ""),
+        "safe_topics":      patient.get("approved_topics", []),
+        "triggers":         patient.get("known_triggers", []),
+        "key_people":       patient.get("key_people", []),
+    }
+
+    payload = {
+        "patient_id":   data.patient_id,
+        "user_input":   data.user_input,
+        "patient_info": patient_info,
+        "chat_history": data.chat_history,
+        # tier is auto-detected inside llm_chat when not supplied
+    }
+
+    try:
+        from llm_chat import generate_response
+        result = generate_response(payload)
+        return result
+    except Exception as exc:
+        # Never crash the session — use the smart template fallback
+        try:
+            from llm_chat import _template_fallback, detect_tier
+            tier = detect_tier(data.user_input, data.chat_history)
+            return _template_fallback(data.user_input, patient_info, tier)
+        except Exception:
+            return {
+                "response_text": "I'm right here with you. Take your time.",
+                "ui_signal":     "NONE",
+                "log_entry":     f"Backend LLM error: {type(exc).__name__}: {exc}",
+            }
+
+
 @app.post("/chat/save-session")
 def save_session(data: SessionSave):
     caregivers  = load_json(CAREGIVERS_FILE)
@@ -666,3 +729,4 @@ def delete_caregiver_account(data: dict):
                 patients_db[pid]["authorized_users"] = authorized
     save_json(PATIENTS_FILE, patients_db)
     return {"success": True}
+    

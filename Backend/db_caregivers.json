@@ -22,5 +22,13 @@
         "email": "b@b",
         "password": "b",
         "patient_ids": []
+    },
+    "mmhansen@uwaterloo.ca": {
+        "full_name": "Testing",
+        "email": "mmhansen@uwaterloo.ca",
+        "password": "m",
+        "patient_ids": [
+            "P-1773428369"
+        ]
     }
 }

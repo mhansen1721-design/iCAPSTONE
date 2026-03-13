@@ -3,7 +3,8 @@ import type { PatientProfile } from '../types';
 import {
   Plus, Edit2, ArrowRight, LogOut, Trash2,
   AlertTriangle, MessageCircle, ShieldAlert,
-  Settings as SettingsIcon, Users, KeyRound, Check, X
+  Settings as SettingsIcon, Users, KeyRound, Check, X,
+  BookOpen, ClipboardList, Image as ImageIcon
 } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 
@@ -13,15 +14,15 @@ interface DashboardProps {
   refreshKey: number;
   onAddPatient: () => void;
   onEditPatient: (id: string) => void;
+  onConfigPatient?: (id: string) => void; // New: opens directly to Configure
   onDeletePatient: (id: string) => void;
   onDeleteAccount: () => void;
   onChat: (id: string, minutes: number) => void;
   onLogout: () => void;
-  onOpenCareCenter: (id: string) => void;
+  onOpenCareCenter: (id?: string) => void;
   onJoinSuccess: () => void;
   setAppPatients: (patients: PatientProfile[]) => void;
   onViewLogs: () => void;
-  // Keep patients prop for type compatibility but we also fetch internally
   patients?: PatientProfile[];
 }
 
@@ -31,6 +32,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   refreshKey,
   onAddPatient,
   onEditPatient,
+  onConfigPatient,
   onDeletePatient,
   onDeleteAccount,
   onChat,
@@ -46,18 +48,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Account deletion modal
   const [showAccountDeleteModal, setShowAccountDeleteModal] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [isAccountWiping, setIsAccountWiping] = useState(false);
 
-  // Session time modal
   const [timeModalPatientId, setTimeModalPatientId] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<number | 'custom'>(15);
   const [customMinutes, setCustomMinutes] = useState<string>('');
 
-  // Join Care Circle modal
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
@@ -147,10 +146,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         setJoinSuccess(`You've joined ${data.patient_name}'s care circle!`);
         setJoinCode('');
         onJoinSuccess();
-        setTimeout(() => {
-          setShowJoinModal(false);
-          setJoinSuccess(null);
-        }, 2000);
+        setTimeout(() => { setShowJoinModal(false); setJoinSuccess(null); }, 2000);
       } else {
         setJoinError(data.detail || 'Invalid access code. Please try again.');
       }
@@ -161,6 +157,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // Clicking a patient card goes directly to Configure
+  const handlePatientCardClick = (id: string) => {
+    if (onConfigPatient) {
+      onConfigPatient(id);
+    } else {
+      onEditPatient(id);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -194,48 +198,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-   {/* ── DELETE ACCOUNT MODAL ── */}
-{showAccountDeleteModal && (
-  <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
-    <div className="bg-[var(--nura-bg)] border border-[var(--nura-text)]/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl animate-in zoom-in duration-300">
-      <ShieldAlert size={48} className="text-red-400 mx-auto mb-4" />
-      <h2 className="text-2xl font-black text-[var(--nura-text)] text-center mb-6">Delete Account</h2>
-      
-      <div className="space-y-3 mb-6">
-        <input 
-          type="email" 
-          placeholder="Confirm email" 
-          value={confirmEmail} 
-          onChange={(e) => setConfirmEmail(e.target.value)}
-          className="w-full bg-[var(--nura-text)]/[0.05] border border-[var(--nura-text)]/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-red-400/50 transition-all placeholder:text-[var(--nura-text)]/30" 
-        />
-        <input 
-          type="password" 
-          placeholder="Confirm password" 
-          value={confirmPass} 
-          onChange={(e) => setConfirmPass(e.target.value)}
-          className="w-full bg-[var(--nura-text)]/[0.05] border border-[var(--nura-text)]/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-red-400/50 transition-all placeholder:text-[var(--nura-text)]/30" 
-        />
-      </div>
-
-      <div className="flex gap-4">
-        <button 
-          onClick={() => setShowAccountDeleteModal(false)} 
-          className="flex-1 py-4 rounded-2xl bg-[var(--nura-text)]/5 hover:bg-[var(--nura-text)]/10 font-bold text-[var(--nura-text)] transition-colors"
-        >
-          Cancel
-        </button>
-        <button 
-          onClick={handleFullAccountDeletion} 
-          disabled={isAccountWiping} 
-          className="flex-1 py-4 rounded-2xl bg-red-500 hover:bg-red-600 font-black text-white shadow-lg shadow-red-500/20 transition-all active:scale-95 disabled:opacity-50"
-        >
-          {isAccountWiping ? 'Deleting...' : 'Delete'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {/* ── DELETE ACCOUNT MODAL ── */}
+      {showAccountDeleteModal && (
+        <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-[var(--nura-bg)] border border-[var(--nura-text)]/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl animate-in zoom-in duration-300">
+            <ShieldAlert size={48} className="text-red-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-black text-[var(--nura-text)] text-center mb-6">Delete Account</h2>
+            <div className="space-y-3 mb-6">
+              <input type="email" placeholder="Confirm email" value={confirmEmail} onChange={(e) => setConfirmEmail(e.target.value)}
+                className="w-full bg-[var(--nura-text)]/[0.05] border border-[var(--nura-text)]/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-red-400/50 transition-all placeholder:text-[var(--nura-text)]/30" />
+              <input type="password" placeholder="Confirm password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)}
+                className="w-full bg-[var(--nura-text)]/[0.05] border border-[var(--nura-text)]/10 rounded-xl p-4 text-[var(--nura-text)] focus:outline-none focus:border-red-400/50 transition-all placeholder:text-[var(--nura-text)]/30" />
+            </div>
+            <div className="flex gap-4">
+              <button onClick={() => setShowAccountDeleteModal(false)} className="flex-1 py-4 rounded-2xl bg-[var(--nura-text)]/5 hover:bg-[var(--nura-text)]/10 font-bold text-[var(--nura-text)] transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleFullAccountDeletion} disabled={isAccountWiping} className="flex-1 py-4 rounded-2xl bg-red-500 hover:bg-red-600 font-black text-white shadow-lg shadow-red-500/20 transition-all active:scale-95 disabled:opacity-50">
+                {isAccountWiping ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── JOIN CARE CIRCLE MODAL ── */}
       {showJoinModal && (
@@ -253,32 +238,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <X size={20} className="text-[var(--nura-dim)]" />
               </button>
             </div>
-
             <p className="text-[var(--nura-dim)] text-sm mb-6 leading-relaxed">
               Enter the 6-character access code shared by the primary caregiver.
             </p>
-
-            <input
-              type="text"
-              placeholder="e.g. AB3X9Q"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={6}
-              className="w-full bg-black/20 border-2 border-[var(--nura-accent)]/30 focus:border-[var(--nura-accent)] rounded-2xl p-4 text-[var(--nura-text)] text-center text-2xl font-black tracking-[0.3em] focus:outline-none transition-all mb-4"
-            />
-
-            {joinError && (
-              <p className="text-red-400 text-sm font-bold text-center mb-4 animate-pulse">{joinError}</p>
-            )}
-            {joinSuccess && (
-              <p className="text-emerald-400 text-sm font-bold text-center mb-4">{joinSuccess}</p>
-            )}
-
-            <button
-              onClick={handleJoinCareCircle}
-              disabled={joinCode.length < 6 || isJoining}
-              className="w-full py-4 bg-[var(--nura-accent)] rounded-2xl font-black text-white disabled:opacity-40 transition-all"
-            >
+            <input type="text" placeholder="e.g. AB3X9Q" value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())} maxLength={6}
+              className="w-full bg-black/20 border-2 border-[var(--nura-accent)]/30 focus:border-[var(--nura-accent)] rounded-2xl p-4 text-[var(--nura-text)] text-center text-2xl font-black tracking-[0.3em] focus:outline-none transition-all mb-4" />
+            {joinError && <p className="text-red-400 text-sm font-bold text-center mb-4 animate-pulse">{joinError}</p>}
+            {joinSuccess && <p className="text-emerald-400 text-sm font-bold text-center mb-4">{joinSuccess}</p>}
+            <button onClick={handleJoinCareCircle} disabled={joinCode.length < 6 || isJoining}
+              className="w-full py-4 bg-[var(--nura-accent)] rounded-2xl font-black text-white disabled:opacity-40 transition-all">
               {isJoining ? 'Joining...' : 'Join Circle'}
             </button>
           </div>
@@ -295,8 +264,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <button onClick={onViewLogs} className="p-2.5 bg-[var(--nura-card)] hover:bg-[var(--nura-accent)]/20 rounded-full border border-white/10 transition-all text-[var(--nura-dim)] hover:text-[var(--nura-text)]">
             <SettingsIcon size={20} />
           </button>
-
-          {/* Join Care Circle */}
           <button
             onClick={() => { setShowJoinModal(true); setJoinError(null); setJoinSuccess(null); }}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--nura-accent)]/10 hover:bg-[var(--nura-accent)]/20 border border-[var(--nura-accent)]/20 rounded-xl text-[var(--nura-accent)] text-sm font-bold transition-all"
@@ -323,6 +290,64 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ── PATIENT GRID ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+
+        {/* ── CARE CENTER TILE (Pinned First) ── */}
+        <button
+          type="button"
+          onClick={() => onOpenCareCenter(undefined)}
+          className="group relative w-full bg-[var(--nura-card)] rounded-[2.5rem] border border-[var(--nura-accent)]/25 hover:border-[var(--nura-accent)]/60 transition-all flex flex-col overflow-hidden shadow-2xl cursor-pointer min-h-[340px] text-left"
+        >
+          {/* Ambient glow layer */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[var(--nura-accent)]/8 via-transparent to-purple-600/8 pointer-events-none rounded-[2.5rem]" />
+
+          {/* Top accent bar */}
+          <div className="h-1 w-full bg-gradient-to-r from-[var(--nura-accent)]/60 via-purple-500/60 to-[var(--nura-accent)]/60" />
+
+          {/* Card body */}
+          <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
+            {/* Icon cluster */}
+            <div className="relative mb-5">
+              <div className="w-20 h-20 rounded-full bg-[var(--nura-accent)]/15 border border-[var(--nura-accent)]/30 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-[var(--nura-accent)]/10">
+                <Users size={36} className="text-[var(--nura-accent)]" />
+              </div>
+              {/* Small floating icons */}
+              <div className="absolute -top-1 -right-2 w-7 h-7 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                <BookOpen size={12} className="text-blue-400" />
+              </div>
+              <div className="absolute -bottom-1 -right-2 w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                <ImageIcon size={12} className="text-emerald-400" />
+              </div>
+              <div className="absolute -bottom-1 -left-2 w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                <ClipboardList size={12} className="text-amber-400" />
+              </div>
+            </div>
+
+            <h3 className="text-3xl font-black text-[var(--nura-text)] mb-1">Care Center</h3>
+            <p className="text-[10px] uppercase text-[var(--nura-accent)] font-black tracking-[0.2em]">
+              Collaborative Hub
+            </p>
+
+            {/* Stats pill */}
+            {patients.length > 0 && (
+              <div className="mt-4 flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--nura-accent)]/10 rounded-full border border-[var(--nura-accent)]/20">
+                  <Users size={11} className="text-[var(--nura-accent)]" />
+                  <span className="text-[10px] font-black text-[var(--nura-accent)] uppercase tracking-widest">
+                    {patients.length} patient{patients.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom CTA bar */}
+          <div className="border-t border-[var(--nura-accent)]/15 py-5 px-4 flex items-center justify-center gap-2 hover:bg-[var(--nura-accent)]/10 transition-all">
+            <span className="font-black text-[var(--nura-accent)] text-xs tracking-widest uppercase">Open Care Center</span>
+            <ArrowRight size={14} className="text-[var(--nura-accent)] group-hover:translate-x-1 transition-transform duration-300" />
+          </div>
+        </button>
+
+        {/* ── PATIENT PROFILE CARDS ── */}
         {patients.map((patient) => {
           const id = patient.patient_id || patient.id;
           const caregiverCount = (patient.authorized_users || []).length;
@@ -332,9 +357,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               key={id}
               className="group bg-[var(--nura-card)] rounded-[2.5rem] relative w-full hover:border-[var(--nura-accent)]/40 transition-all flex flex-col overflow-hidden border border-white/5 shadow-2xl"
             >
-              {/* Card body */}
+              {/* Card body — clicking goes directly to Configure */}
               <div
-                onClick={() => onEditPatient(id)}
+                onClick={() => handlePatientCardClick(id)}
                 className="flex-1 flex flex-col items-center justify-center p-8 cursor-pointer relative"
               >
                 <div className="mb-4 transform group-hover:scale-110 transition-transform duration-500">
@@ -347,7 +372,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </p>
                 </div>
 
-                 {/* Care circle count */}
+                {/* Care circle count */}
                 {caregiverCount > 0 && (
                   <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-[var(--nura-accent)]/10 rounded-full border border-[var(--nura-accent)]/20">
                     <Users size={11} className="text-[var(--nura-accent)]" />
@@ -360,7 +385,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {/* Action icons (hover) */}
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-30 flex gap-2">
                   <button
-                    onClick={(e) => { e.stopPropagation(); onEditPatient(id); }}
+                    onClick={(e) => { e.stopPropagation(); handlePatientCardClick(id); }}
                     className="p-2.5 bg-black/40 hover:bg-[var(--nura-accent)]/40 rounded-full text-[var(--nura-text)] border border-white/10 transition-all backdrop-blur-md"
                   >
                     <Edit2 size={16} />
@@ -374,23 +399,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
-
-
-              {/* ── BOTTOM ACTION ROW ── */}
-              <div className="grid grid-cols-2 border-t border-white/10">
-                {/* Care Center */}
+              {/* ── BOTTOM ACTION ROW — Start Chat only ── */}
+              <div className="border-t border-white/10">
                 <button
-                  onClick={() => onOpenCareCenter(id)}
-                  className="py-5 px-4 flex items-center justify-center gap-2 hover:bg-[var(--nura-accent)]/10 transition-all border-r border-white/10"
-                >
-                  <Users size={16} className="text-[var(--nura-accent)]" />
-                  <span className="font-black text-[var(--nura-text)] text-xs tracking-wide">CARE CIRCLE</span>
-                </button>
-
-                {/* Begin Session */}
-                <button
-                  onClick={() => setTimeModalPatientId(id)}
-                  className="py-5 px-4 flex items-center justify-center gap-2 hover:bg-green-500/10 transition-all"
+                  onClick={(e) => { e.stopPropagation(); setTimeModalPatientId(id); }}
+                  className="w-full py-5 px-4 flex items-center justify-center gap-2 hover:bg-green-500/10 transition-all"
                 >
                   <MessageCircle size={16} className="text-green-400" />
                   <span className="font-black text-[var(--nura-text)] text-xs tracking-wide">START CHAT</span>
@@ -445,7 +458,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 Custom
               </button>
             </div>
-
             {selectedTime === 'custom' && (
               <input
                 type="number"
@@ -455,16 +467,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 className="w-full bg-black/40 border border-[var(--nura-accent)]/50 rounded-xl p-4 text-[var(--nura-text)] text-center mb-6"
               />
             )}
-
             <div className="flex gap-4">
               <button onClick={() => setTimeModalPatientId(null)} className="flex-1 py-4 text-[var(--nura-text)] font-bold bg-white/5 rounded-2xl">
                 Back
               </button>
               <button
                 onClick={() => {
-                  const mins = selectedTime === 'custom'
-                    ? parseInt(customMinutes) || 15
-                    : selectedTime as number;
+                  const mins = selectedTime === 'custom' ? parseInt(customMinutes) || 15 : selectedTime as number;
                   onChat(timeModalPatientId, mins);
                   setTimeModalPatientId(null);
                 }}

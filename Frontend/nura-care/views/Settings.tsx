@@ -36,7 +36,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentSettings, onSave, onB
     // These are the baseline defaults for the app
     const defaults: AppSettings = {
       fontSize: 'medium',
-      colorPalette: 'deep-space',
+      colorPalette: 'twilight',
       reducedMotion: false
     };
     setLocalSettings(defaults);

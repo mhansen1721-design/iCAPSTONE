@@ -146,7 +146,24 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
   return (
     <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 pb-48 text-[var(--nura-text)]">
       <div className="max-w-3xl mx-auto w-full space-y-8">
-        
+
+        {/* ── PAGE HEADER ── */}
+        <div className="text-center pt-2 pb-4">
+          {patient ? (
+            <>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--nura-accent)] mb-2">Configure</p>
+              <h1 className="text-4xl font-extrabold text-[var(--nura-text)]">
+                Edit {formData.name || patient.name || (patient as any).full_name}'s Details
+              </h1>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--nura-accent)] mb-2">New Profile</p>
+              <h1 className="text-4xl font-extrabold text-[var(--nura-text)]">Add a Loved One</h1>
+            </>
+          )}
+        </div>
+
         {/* PAGE 1: BASICS */}
         {currentStep === 0 && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
