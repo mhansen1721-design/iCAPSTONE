@@ -18,9 +18,9 @@
 
 /* --- TWILIGHT (Purple/Sunset) --- */
 .theme-twilight {
-  --nura-bg: #F3E5F5 !important;     /* Very pale lavender */
+  --nura-bg: #E3D5FF!important;     /* Very pale lavender */
   --nura-card: #FFFFFF !important;   /* Solid white for sharp edges */
-  --nura-accent: #7B1FA2 !important; /* Rich deep purple */
+  --nura-accent: #6231C6!important; /* Rich deep purple */
   --nura-text: #2D1B33 !important;   /* Deep Plum - very dark for text */
   --nura-dim: #6A1B9A !important;    /* Mid-tone purple */
 }

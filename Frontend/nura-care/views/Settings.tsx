@@ -49,7 +49,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentSettings, onSave, onB
     { id: 'deep-space', label: 'Deep Space', bg: '#171140', accent: '#715ffa', desc: "Premium Tech: Modern and low-glare." },
     { id: 'serene-nature', label: 'Serene Nature', bg: '#cbdad5', accent: '#065a60', desc: "Clinical Healing: Soft and biophilic." },
     { id: 'high-clarity', label: 'High-Clarity', bg: '#000000', accent: '#f1bd00', desc: "Dark Mode: High contrast for vision." },
-    { id: 'twilight', label: 'Twilight', bg: '#F3E5F5', accent: '#7B1FA2', desc: "Warmth: Comforting and homey." },
+    { id: 'twilight', label: 'Twilight', bg: '#E3D5FF', accent: '#6231C6', desc: "Warmth: Comforting and homey." },
   ];
 
   return (
