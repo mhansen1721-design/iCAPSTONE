@@ -1,0 +1,14 @@
+{
+    "P-1773428369": [
+        {
+            "photo_id": "IMG-1773429744-314",
+            "patient_id": "P-1773428369",
+            "filename": "IMG-1773429744-314.png",
+            "url": "http://127.0.0.1:8000/uploads/IMG-1773429744-314.png",
+            "description": "Sharing photo from last christmas",
+            "uploaded_by_email": "2c@c",
+            "uploaded_by_name": "Testing2",
+            "timestamp": "2026-03-13 15:22:24"
+        }
+    ]
+}

@@ -17,13 +17,18 @@ export const Settings: React.FC<SettingsProps> = ({ currentSettings, onSave, onB
   }, [currentSettings]);
 
   const handleSave = () => {
-    onSave(localSettings);
-    
-    // Applying the change permanently to the document
+    // Save to per-user localStorage key so each caregiver has independent settings
+    if (caregiverEmail) {
+      const key = `nura-settings:${caregiverEmail.toLowerCase().trim()}`;
+      localStorage.setItem(key, JSON.stringify(localSettings));
+    }
+
+    // Apply theme to DOM immediately
     const themeClass = `theme-${localSettings.colorPalette}`;
     document.documentElement.className = themeClass;
     document.body.className = themeClass;
-    
+
+    onSave(localSettings);
     onBack();
   };
 

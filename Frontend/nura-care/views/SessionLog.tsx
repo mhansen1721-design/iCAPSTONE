@@ -161,9 +161,15 @@ export const SessionLogs: React.FC<SessionLogsProps> = ({ logs = [], onBack, isS
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <div className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold uppercase tracking-wider">
-                          Completed
-                        </div>
+                        {(log as any).endReason === 'early' ? (
+                          <div className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                            Ended Early
+                          </div>
+                        ) : (
+                          <div className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold uppercase tracking-wider">
+                            Completed
+                          </div>
+                        )}
                         {isExpanded ? <ChevronUp size={20} className="text-[var(--nura-dim)]" /> : <ChevronDown size={20} className="text-[var(--nura-dim)]" />}
                       </div>
                     </div>

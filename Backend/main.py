@@ -1,29 +1,63 @@
 import json
 import os
+import shutil
 import datetime
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+import random
+import string
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Enabling CORS for React frontend connectivity
-# Using "*" for development; update to specific origins for production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-DB_FILE = "db_patients.json"
-CHAT_LOGS_FILE = "db_chat_logs.json"
+# ─────────────────────────────────────────────
+# FILE LAYOUT  (all auto-created on first write)
+# ─────────────────────────────────────────────
+# db_caregivers.json    { email: { full_name, password, patient_ids[] } }
+# db_patients.json      { patient_id: { ...profile, access_code, authorized_users[] } }
+# db_chat_logs.json     { patient_id: { full_name, sessions[{ timestamp, logged_by, transcript[] }] } }
+# db_care_journal.json  { patient_id: [{ entry_id, author_email, author_name, content, type, timestamp }] }
+# db_help_requests.json { patient_id: [{ request_id, title, description,
+#                                        author_email, author_name,
+#                                        claimed_by, claimed_name, status, timestamp }] }
+# db_memory_box.json    { patient_id: [{ photo_id, filename, url, description,
+#                                        uploaded_by_email, uploaded_by_name, timestamp }] }
+#
+# uploads/              Folder where image files are physically stored on disk.
+#                       Served as static files at GET /uploads/{filename}
+CAREGIVERS_FILE    = "db_caregivers.json"
+PATIENTS_FILE      = "db_patients.json"
+CHAT_LOGS_FILE     = "db_chat_logs.json"
+JOURNAL_FILE       = "db_care_journal.json"
+HELP_REQUESTS_FILE = "db_help_requests.json"
+MEMORY_BOX_FILE    = "db_memory_box.json"
+UPLOADS_DIR        = "uploads"
 
-# --- 1. HELPERS ---
-def load_json(filename):
-    """Safely loads JSON or returns an empty dict if file is missing/corrupt."""
+# Create the uploads folder if it doesn't exist yet
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+# Serve the uploads folder as static files so the frontend can load images
+# e.g. GET http://127.0.0.1:8000/uploads/photo_abc123.jpg
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+# Allowed image extensions (basic safety check)
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"}
+
+
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+def load_json(filename: str) -> dict:
     if not os.path.exists(filename):
         return {}
     with open(filename, "r") as f:
@@ -32,24 +66,42 @@ def load_json(filename):
         except json.JSONDecodeError:
             return {}
 
-def save_json(filename, data):
-    """Saves data with clean indentation for readability."""
+
+def save_json(filename: str, data: dict):
     with open(filename, "w") as f:
         json.dump(data, f, indent=4)
 
-def get_timestamp():
-    """Generates standard timestamp for session logging."""
+
+def get_timestamp() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# --- 2. DATA MODELS ---
+
+def generate_access_code() -> str:
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+
+def short_id(prefix: str) -> str:
+    return f"{prefix}-{int(datetime.datetime.now().timestamp())}-{random.randint(100, 999)}"
+
+
+def require_authorized(patient: dict, email: str):
+    if email.lower() not in patient.get("authorized_users", []):
+        raise HTTPException(status_code=403, detail="Not authorized for this patient's care circle.")
+
+
+# ─────────────────────────────────────────────
+# DATA MODELS
+# ─────────────────────────────────────────────
 class UserRegistration(BaseModel):
     full_name: str
     email: str
     password: str
 
+
 class KeyPerson(BaseModel):
     name: str = ""
     relation: str = ""
+
 
 class PatientProfile(BaseModel):
     patient_id: Optional[str] = None
@@ -63,10 +115,12 @@ class PatientProfile(BaseModel):
     approved_topics: List[str] = []
     known_triggers: List[str] = []
 
+
 class MessageModel(BaseModel):
     sender: str
     text: str
     timestamp: str
+
 
 class SessionSave(BaseModel):
     email: str
@@ -74,177 +128,541 @@ class SessionSave(BaseModel):
     patient_id: str
     full_name: str
     messages: List[MessageModel]
+    end_reason: str = "completed"   # "completed" = timer ended | "early" = End Session button
 
-# --- 3. AUTH & REGISTRATION ---
+
+class JoinCircleRequest(BaseModel):
+    email: str
+    access_code: str
+
+
+class JournalEntryCreate(BaseModel):
+    patient_id: str
+    author_email: str
+    content: str
+    type: str = "update"   # update | medication | problem | milestone
+
+
+class HelpRequestCreate(BaseModel):
+    patient_id: str
+    author_email: str
+    title: str
+    description: str = ""
+
+
+class ClaimRequest(BaseModel):
+    claimer_email: str
+
+
+# ─────────────────────────────────────────────
+# 1. AUTH & REGISTRATION
+# ─────────────────────────────────────────────
 @app.post("/register")
 def register(data: UserRegistration):
-    db = load_json(DB_FILE)
+    caregivers = load_json(CAREGIVERS_FILE)
     email_key = data.email.lower().strip()
-    if email_key in db:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    db[email_key] = {
-        "full_name": data.full_name, 
-        "email": email_key, 
-        "password": data.password, 
-        "patients": []
+    if email_key in caregivers:
+        raise HTTPException(status_code=400, detail="Email already registered.")
+    caregivers[email_key] = {
+        "full_name": data.full_name,
+        "email": email_key,
+        "password": data.password,
+        "patient_ids": []
     }
-    save_json(DB_FILE, db)
+    save_json(CAREGIVERS_FILE, caregivers)
     return {"success": True}
+
 
 @app.post("/login")
 def login(email: str, password: str):
-    db = load_json(DB_FILE)
+    caregivers = load_json(CAREGIVERS_FILE)
     email_key = email.lower().strip()
-    user = db.get(email_key)
+    user = caregivers.get(email_key)
     if user and user["password"] == password:
-        return {
-            "success": True, 
-            "caregiver_name": user.get("full_name"),
-            "patients": user.get("patients", [])
-        }
+        return {"success": True, "caregiver_name": user.get("full_name")}
     return {"success": False, "message": "Invalid credentials"}
 
-# --- 4. PROFILE MANAGEMENT ---
-@app.get("/caregiver/init-profile/{email}")
-def init_companion_profile(email: str):
-    db = load_json(DB_FILE)
+
+# ─────────────────────────────────────────────
+# 2. PATIENT MANAGEMENT
+# ─────────────────────────────────────────────
+@app.get("/caregiver/{email}/patients")
+def get_caregiver_patients(email: str):
+    caregivers = load_json(CAREGIVERS_FILE)
+    patients_db = load_json(PATIENTS_FILE)
     email_key = email.lower().strip()
-    user = db.get(email_key)
-    if not user:
+    caregiver = caregivers.get(email_key)
+    if not caregiver:
         raise HTTPException(status_code=404, detail="Caregiver not found.")
-    
-    patients = user.get("patients", [])
+    patient_ids = caregiver.get("patient_ids", [])
+    patients = [patients_db[pid] for pid in patient_ids if pid in patients_db]
     return {"exists": len(patients) > 0, "patients": patients}
+
+
+# Backward-compatible alias
+@app.get("/caregiver/init-profile/{email}")
+def init_companion_profile_legacy(email: str):
+    return get_caregiver_patients(email)
+
 
 @app.post("/patients/save/{email}")
 def save_or_update_patient(email: str, data: PatientProfile):
-    db = load_json(DB_FILE)
+    caregivers = load_json(CAREGIVERS_FILE)
+    patients_db = load_json(PATIENTS_FILE)
     email_key = email.lower().strip()
-    if email_key not in db: 
+    if email_key not in caregivers:
         raise HTTPException(status_code=404, detail="Caregiver account not found.")
-    
+
     patient_dict = data.model_dump()
-    
-    # 1. Handle Patient ID
     incoming_id = patient_dict.get("patient_id")
-    if not incoming_id:
-        final_id = f"P-{int(datetime.datetime.now().timestamp())}"
-        patient_dict["patient_id"] = final_id
-    else:
-        final_id = incoming_id
+    final_id = incoming_id if incoming_id else f"P-{int(datetime.datetime.now().timestamp())}"
+    patient_dict["patient_id"] = final_id
 
-    # 2. Update Patient Profile in db_patients.json
-    patients = db[email_key].get("patients", [])
-    updated = False
-    for i, p in enumerate(patients):
-        if p.get("patient_id") == final_id:
-            patients[i] = patient_dict
-            updated = True
-            break
-            
-    if not updated:
-        patients.append(patient_dict)
-    
-    db[email_key]["patients"] = patients
-    save_json(DB_FILE, db)
+    existing = patients_db.get(final_id, {})
+    patient_dict["access_code"] = existing.get("access_code") or generate_access_code()
+    authorized = existing.get("authorized_users", [])
+    if email_key not in authorized:
+        authorized.append(email_key)
+    patient_dict["authorized_users"] = authorized
 
-    # 3. SYNC NAME TO CHAT LOGS
-    # We load the chat logs and look for any sessions belonging to this patient_id
-    # to update the "full_name" field so the Logs view stays current.
+    patients_db[final_id] = patient_dict
+    save_json(PATIENTS_FILE, patients_db)
+
+    if final_id not in caregivers[email_key]["patient_ids"]:
+        caregivers[email_key]["patient_ids"].append(final_id)
+    save_json(CAREGIVERS_FILE, caregivers)
+
     logs = load_json(CHAT_LOGS_FILE)
-    new_name = patient_dict.get("full_name", "Unnamed")
-
-    if email_key in logs:
-        # The structure is logs[email][password][patient_id]
-        for password_key in logs[email_key]:
-            if final_id in logs[email_key][password_key]:
-                logs[email_key][password_key][final_id]["full_name"] = new_name
-        
+    if final_id in logs:
+        logs[final_id]["full_name"] = patient_dict.get("full_name", "Unnamed")
         save_json(CHAT_LOGS_FILE, logs)
-    
-    return {"success": True, "patient_id": final_id}
-    
+
+    return {"success": True, "patient_id": final_id, "access_code": patient_dict["access_code"]}
 
 
 @app.delete("/patients/delete/{email}/{patient_id}")
-async def delete_patient_profile(email: str, patient_id: str): # Added async
-    db = load_json(DB_FILE)
+def delete_patient_profile(email: str, patient_id: str):
+    caregivers = load_json(CAREGIVERS_FILE)
+    patients_db = load_json(PATIENTS_FILE)
     email_key = email.lower().strip()
-    
-    if email_key not in db:
+    if email_key not in caregivers:
         raise HTTPException(status_code=404, detail="Caregiver not found.")
-    
-    patients = db[email_key].get("patients", [])
-    
-    # Check if patient exists before filtering
-    patient_exists = any(p.get("patient_id") == patient_id for p in patients)
-    if not patient_exists:
-         raise HTTPException(status_code=404, detail="Patient ID not found.")
+    patient = patients_db.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, email_key)
 
-    # Filter out the patient
-    filtered_patients = [p for p in patients if p.get("patient_id") != patient_id]
-    
-    db[email_key]["patients"] = filtered_patients
-    save_json(DB_FILE, db)
-    
-    # Return a clean 200 OK with the success body
-    return {"success": True, "message": "Patient deleted successfully"}
+    authorized = [u for u in patient.get("authorized_users", []) if u != email_key]
+    caregivers[email_key]["patient_ids"] = [
+        p for p in caregivers[email_key]["patient_ids"] if p != patient_id
+    ]
+    save_json(CAREGIVERS_FILE, caregivers)
 
-# --- 5. SESSION LOGGING ---
+    if not authorized:
+        del patients_db[patient_id]
+    else:
+        patients_db[patient_id]["authorized_users"] = authorized
+    save_json(PATIENTS_FILE, patients_db)
+    return {"success": True, "message": "Removed from care circle."}
+
+
+# ─────────────────────────────────────────────
+# 3. CARE CIRCLE — JOIN & ACTIVATE
+# ─────────────────────────────────────────────
+@app.post("/patients/join")
+def join_care_circle(data: JoinCircleRequest):
+    caregivers = load_json(CAREGIVERS_FILE)
+    patients_db = load_json(PATIENTS_FILE)
+    email_key = data.email.lower().strip()
+    code = data.access_code.upper().strip()
+
+    if email_key not in caregivers:
+        raise HTTPException(status_code=404, detail="Caregiver account not found. Please register first.")
+
+    target_id = next(
+        (pid for pid, p in patients_db.items() if p.get("access_code") == code), None
+    )
+    if not target_id:
+        raise HTTPException(status_code=404, detail="Invalid access code.")
+
+    target_patient = patients_db[target_id]
+    authorized = target_patient.get("authorized_users", [])
+    if email_key not in authorized:
+        authorized.append(email_key)
+        patients_db[target_id]["authorized_users"] = authorized
+        save_json(PATIENTS_FILE, patients_db)
+
+    if target_id not in caregivers[email_key]["patient_ids"]:
+        caregivers[email_key]["patient_ids"].append(target_id)
+        save_json(CAREGIVERS_FILE, caregivers)
+
+    return {"success": True, "patient_name": target_patient.get("full_name"), "patient_id": target_id}
+
+
+@app.post("/patients/activate-circle/{patient_id}")
+def activate_care_circle(patient_id: str):
+    patients_db = load_json(PATIENTS_FILE)
+    patient = patients_db.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    if not patient.get("access_code"):
+        patient["access_code"] = generate_access_code()
+        patients_db[patient_id] = patient
+        save_json(PATIENTS_FILE, patients_db)
+    return {"success": True, "access_code": patient["access_code"]}
+
+
+# ─────────────────────────────────────────────
+# 4. CARE CENTER — UNIFIED BUNDLE
+# ─────────────────────────────────────────────
+@app.get("/patients/{patient_id}/care-center")
+def get_care_center(patient_id: str, email: str):
+    patients_db   = load_json(PATIENTS_FILE)
+    journal_db    = load_json(JOURNAL_FILE)
+    logs_db       = load_json(CHAT_LOGS_FILE)
+    requests_db   = load_json(HELP_REQUESTS_FILE)
+    memory_db     = load_json(MEMORY_BOX_FILE)
+    caregivers_db = load_json(CAREGIVERS_FILE)
+
+    patient = patients_db.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, email)
+
+    caregivers_info = [
+        {"email": cg_email, "full_name": caregivers_db.get(cg_email, {}).get("full_name", cg_email)}
+        for cg_email in patient.get("authorized_users", [])
+    ]
+
+    return {
+        "patient":       patient,
+        "access_code":   patient.get("access_code"),
+        "journal":       sorted(journal_db.get(patient_id, []),   key=lambda x: x.get("timestamp", ""), reverse=True),
+        "sessions":      sorted(logs_db.get(patient_id, {}).get("sessions", []), key=lambda x: x.get("timestamp", ""), reverse=True)[:30],
+        "help_requests": sorted(requests_db.get(patient_id, []),  key=lambda x: x.get("timestamp", ""), reverse=True),
+        "memory_box":    sorted(memory_db.get(patient_id, []),    key=lambda x: x.get("timestamp", ""), reverse=True),
+        "caregivers":    caregivers_info,
+    }
+
+
+# ─────────────────────────────────────────────
+# 5. CARE JOURNAL
+# ─────────────────────────────────────────────
+@app.get("/api/journal/{patient_id}")
+def get_journal(patient_id: str, email: str):
+    patients_db = load_json(PATIENTS_FILE)
+    patient = patients_db.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, email)
+    journal_db = load_json(JOURNAL_FILE)
+    return sorted(journal_db.get(patient_id, []), key=lambda x: x.get("timestamp", ""), reverse=True)
+
+
+@app.post("/api/journal")
+def add_journal_entry(data: JournalEntryCreate):
+    patients_db   = load_json(PATIENTS_FILE)
+    caregivers_db = load_json(CAREGIVERS_FILE)
+    journal_db    = load_json(JOURNAL_FILE)
+
+    patient = patients_db.get(data.patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, data.author_email)
+
+    author = caregivers_db.get(data.author_email.lower(), {})
+    entry = {
+        "entry_id":    short_id("J"),
+        "patient_id":  data.patient_id,
+        "author_email": data.author_email.lower(),
+        "author_name": author.get("full_name", data.author_email),
+        "content":     data.content,
+        "type":        data.type,
+        "timestamp":   get_timestamp(),
+    }
+
+    if data.patient_id not in journal_db:
+        journal_db[data.patient_id] = []
+    journal_db[data.patient_id].append(entry)
+    save_json(JOURNAL_FILE, journal_db)
+    return entry
+
+
+# ─────────────────────────────────────────────
+# 6. HELP REQUESTS
+# ─────────────────────────────────────────────
+@app.get("/api/help-requests/{patient_id}")
+def get_help_requests(patient_id: str, email: str):
+    patients_db = load_json(PATIENTS_FILE)
+    patient = patients_db.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, email)
+    requests_db = load_json(HELP_REQUESTS_FILE)
+    return sorted(requests_db.get(patient_id, []), key=lambda x: x.get("timestamp", ""), reverse=True)
+
+
+@app.post("/api/help-requests")
+def create_help_request(data: HelpRequestCreate):
+    patients_db   = load_json(PATIENTS_FILE)
+    caregivers_db = load_json(CAREGIVERS_FILE)
+    requests_db   = load_json(HELP_REQUESTS_FILE)
+
+    patient = patients_db.get(data.patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, data.author_email)
+
+    author = caregivers_db.get(data.author_email.lower(), {})
+    request = {
+        "request_id":   short_id("HR"),
+        "patient_id":   data.patient_id,
+        "author_email": data.author_email.lower(),
+        "author_name":  author.get("full_name", data.author_email),
+        "title":        data.title,
+        "description":  data.description,
+        "status":       "open",
+        "claimed_by":   None,
+        "claimed_name": None,
+        "timestamp":    get_timestamp(),
+    }
+
+    if data.patient_id not in requests_db:
+        requests_db[data.patient_id] = []
+    requests_db[data.patient_id].append(request)
+    save_json(HELP_REQUESTS_FILE, requests_db)
+    return request
+
+
+@app.post("/api/help-requests/{request_id}/claim")
+def claim_help_request(request_id: str, data: ClaimRequest):
+    patients_db   = load_json(PATIENTS_FILE)
+    caregivers_db = load_json(CAREGIVERS_FILE)
+    requests_db   = load_json(HELP_REQUESTS_FILE)
+    email_key     = data.claimer_email.lower().strip()
+
+    target_pid = None
+    target_idx = None
+    for pid, reqs in requests_db.items():
+        for i, r in enumerate(reqs):
+            if r.get("request_id") == request_id:
+                target_pid = pid
+                target_idx = i
+                break
+        if target_pid:
+            break
+
+    if target_pid is None:
+        raise HTTPException(status_code=404, detail="Help request not found.")
+
+    require_authorized(patients_db.get(target_pid, {}), email_key)
+
+    req = requests_db[target_pid][target_idx]
+    if req["status"] != "open":
+        raise HTTPException(status_code=400, detail="Already claimed or completed.")
+
+    author = caregivers_db.get(email_key, {})
+    req["status"]       = "claimed"
+    req["claimed_by"]   = email_key
+    req["claimed_name"] = author.get("full_name", email_key)
+    requests_db[target_pid][target_idx] = req
+    save_json(HELP_REQUESTS_FILE, requests_db)
+    return req
+
+
+@app.post("/api/help-requests/{request_id}/complete")
+def complete_help_request(request_id: str, data: ClaimRequest):
+    patients_db = load_json(PATIENTS_FILE)
+    requests_db = load_json(HELP_REQUESTS_FILE)
+    email_key   = data.claimer_email.lower().strip()
+
+    for pid, reqs in requests_db.items():
+        for i, r in enumerate(reqs):
+            if r.get("request_id") == request_id:
+                require_authorized(patients_db.get(pid, {}), email_key)
+                requests_db[pid][i]["status"] = "done"
+                save_json(HELP_REQUESTS_FILE, requests_db)
+                return requests_db[pid][i]
+
+    raise HTTPException(status_code=404, detail="Help request not found.")
+
+
+# ─────────────────────────────────────────────
+# 7. MEMORY BOX (Photo Storage)
+# ─────────────────────────────────────────────
+@app.get("/api/memory-box/{patient_id}")
+def get_memory_box(patient_id: str, email: str):
+    """Returns all photos in this patient's memory box."""
+    patients_db = load_json(PATIENTS_FILE)
+    patient = patients_db.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, email)
+    memory_db = load_json(MEMORY_BOX_FILE)
+    return sorted(memory_db.get(patient_id, []), key=lambda x: x.get("timestamp", ""), reverse=True)
+
+
+@app.post("/api/memory-box/upload")
+async def upload_photo(
+    patient_id: str  = Form(...),
+    author_email: str = Form(...),
+    description: str  = Form(""),
+    file: UploadFile  = File(...)
+):
+    """
+    Accepts a multipart form upload. Saves the image to disk under uploads/,
+    then records the metadata in db_memory_box.json so all caregivers can see it.
+
+    The frontend reads the photo back from: GET /uploads/{filename}
+    """
+    patients_db   = load_json(PATIENTS_FILE)
+    caregivers_db = load_json(CAREGIVERS_FILE)
+    memory_db     = load_json(MEMORY_BOX_FILE)
+
+    patient = patients_db.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+    require_authorized(patient, author_email)
+
+    # Validate extension
+    _, ext = os.path.splitext(file.filename or "")
+    ext = ext.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Build a unique filename so nothing ever gets overwritten
+    photo_id = short_id("IMG")
+    safe_filename = f"{photo_id}{ext}"
+    file_path = os.path.join(UPLOADS_DIR, safe_filename)
+
+    # Write the file to disk
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Record metadata
+    author = caregivers_db.get(author_email.lower(), {})
+    photo = {
+        "photo_id":           photo_id,
+        "patient_id":         patient_id,
+        "filename":           safe_filename,
+        # URL the frontend uses to display the image
+        "url":                f"http://127.0.0.1:8000/uploads/{safe_filename}",
+        "description":        description.strip(),
+        "uploaded_by_email":  author_email.lower(),
+        "uploaded_by_name":   author.get("full_name", author_email),
+        "timestamp":          get_timestamp(),
+    }
+
+    if patient_id not in memory_db:
+        memory_db[patient_id] = []
+    memory_db[patient_id].append(photo)
+    save_json(MEMORY_BOX_FILE, memory_db)
+
+    return photo
+
+
+@app.delete("/api/memory-box/{photo_id}")
+def delete_photo(photo_id: str, email: str):
+    """
+    Deletes the image file from disk and removes the metadata record.
+    Only an authorized caregiver can delete.
+    """
+    patients_db = load_json(PATIENTS_FILE)
+    memory_db   = load_json(MEMORY_BOX_FILE)
+
+    # Find the photo across all patient buckets
+    target_pid = None
+    target_idx = None
+    target_photo = None
+    for pid, photos in memory_db.items():
+        for i, p in enumerate(photos):
+            if p.get("photo_id") == photo_id:
+                target_pid   = pid
+                target_idx   = i
+                target_photo = p
+                break
+        if target_pid:
+            break
+
+    if not target_photo:
+        raise HTTPException(status_code=404, detail="Photo not found.")
+
+    require_authorized(patients_db.get(target_pid, {}), email)
+
+    # Delete the actual file from disk
+    file_path = os.path.join(UPLOADS_DIR, target_photo["filename"])
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    # Remove metadata record
+    memory_db[target_pid].pop(target_idx)
+    if not memory_db[target_pid]:
+        del memory_db[target_pid]
+    save_json(MEMORY_BOX_FILE, memory_db)
+
+    return {"success": True, "message": "Photo deleted."}
+
+
+# ─────────────────────────────────────────────
+# 8. SESSION LOGGING
+# ─────────────────────────────────────────────
 @app.post("/chat/save-session")
 def save_session(data: SessionSave):
-    db = load_json(DB_FILE)
-    email_key = data.email.lower().strip()
-    
-    user = db.get(email_key)
-    if not user or user["password"] != data.password:
-        raise HTTPException(status_code=401, detail="Verification failed")
+    caregivers  = load_json(CAREGIVERS_FILE)
+    logs_db     = load_json(CHAT_LOGS_FILE)
+    patients_db = load_json(PATIENTS_FILE)
+    email_key   = data.email.lower().strip()
 
-    logs = load_json(CHAT_LOGS_FILE)
-    if email_key not in logs:
-        logs[email_key] = {}
-    
-    pass_key = data.password
-    if pass_key not in logs[email_key]:
-        logs[email_key][pass_key] = {}
-        
-    if data.patient_id not in logs[email_key][pass_key]:
-        logs[email_key][pass_key][data.patient_id] = {
-            "full_name": data.full_name,
-            "sessions": []
-        }
-  
-    serializable_messages = [msg.model_dump() for msg in data.messages]
-    logs[email_key][pass_key][data.patient_id]["sessions"].append({
-        "timestamp": get_timestamp(),
-        "transcript": serializable_messages 
+    caregiver = caregivers.get(email_key)
+    if not caregiver or caregiver["password"] != data.password:
+        raise HTTPException(status_code=401, detail="Verification failed.")
+
+    patient_name = patients_db.get(data.patient_id, {}).get("full_name", data.full_name)
+
+    if data.patient_id not in logs_db:
+        logs_db[data.patient_id] = {"full_name": patient_name, "sessions": []}
+
+    logs_db[data.patient_id]["sessions"].append({
+        "timestamp":  get_timestamp(),
+        "logged_by":  email_key,
+        "end_reason": data.end_reason,   # "completed" or "early"
+        "transcript": [msg.model_dump() for msg in data.messages],
     })
-    
-    save_json(CHAT_LOGS_FILE, logs)
+    save_json(CHAT_LOGS_FILE, logs_db)
     return {"success": True}
 
-@app.post("/caregiver/delete-account")
-def delete_caregiver_account(data: dict):
-    email = data.get("email", "").lower().strip()
-    password = data.get("password", "")
-    db = load_json(DB_FILE)
-    
-    if email not in db or db[email]["password"] != password:
-        raise HTTPException(status_code=401, detail="Invalid credentials. Could not find your account.")
-    
-    del db[email]
-    save_json(DB_FILE, db)
-    
-    logs = load_json(CHAT_LOGS_FILE)
-    if email in logs:
-        del logs[email]
-        save_json(CHAT_LOGS_FILE, logs)
-        
-    return {"success": True}
 
 @app.get("/chat/logs")
-def get_chat_logs():
-    """Returns the entire chat logs JSON to the frontend."""
-    logs = load_json(CHAT_LOGS_FILE)
-    return logs
+def get_all_chat_logs():
+    return load_json(CHAT_LOGS_FILE)
 
+
+# ─────────────────────────────────────────────
+# 9. ACCOUNT MANAGEMENT
+# ─────────────────────────────────────────────
+@app.post("/caregiver/delete-account")
+def delete_caregiver_account(data: dict):
+    email       = data.get("email", "").lower().strip()
+    password    = data.get("password", "")
+    caregivers  = load_json(CAREGIVERS_FILE)
+    patients_db = load_json(PATIENTS_FILE)
+
+    if email not in caregivers or caregivers[email]["password"] != password:
+        raise HTTPException(status_code=401, detail="Invalid credentials.")
+
+    patient_ids = caregivers[email].get("patient_ids", [])
+    del caregivers[email]
+    save_json(CAREGIVERS_FILE, caregivers)
+
+    for pid in patient_ids:
+        if pid in patients_db:
+            authorized = [u for u in patients_db[pid].get("authorized_users", []) if u != email]
+            if not authorized:
+                del patients_db[pid]
+            else:
+                patients_db[pid]["authorized_users"] = authorized
+    save_json(PATIENTS_FILE, patients_db)
+    return {"success": True}

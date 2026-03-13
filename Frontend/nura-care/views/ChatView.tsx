@@ -112,7 +112,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
-  const handleFinalExit = async () => {
+  // end_reason: 'completed' = timer expired naturally, 'early' = user pressed End Session
+  const handleFinalExit = async (end_reason: 'completed' | 'early' = 'completed') => {
     if (recognitionRef.current) recognitionRef.current.stop();
 
     const payload = {
@@ -120,7 +121,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
       password: caregiverPassword,
       patient_id: patient.patient_id || (patient as any).id,
       full_name: patient.full_name || patient.name,
-      messages: messagesRef.current
+      messages: messagesRef.current,
+      end_reason,
     };
 
     try {
@@ -170,7 +172,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <h2 className="text-3xl font-black mb-6">End Session?</h2>
             <div className="flex gap-4">
               <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-4 rounded-2xl bg-[var(--nura-card)] font-bold">No</button>
-              <button onClick={handleFinalExit} className="flex-1 py-4 rounded-2xl bg-red-500 font-bold">Yes, End</button>
+              <button onClick={() => handleFinalExit('early')} className="flex-1 py-4 rounded-2xl bg-red-500 font-bold">Yes, End</button>
             </div>
           </div>
         </div>

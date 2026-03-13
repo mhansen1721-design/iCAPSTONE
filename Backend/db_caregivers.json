@@ -1,0 +1,26 @@
+{
+    "new@care": {
+        "full_name": "New",
+        "email": "new@care",
+        "password": "n",
+        "patient_ids": [
+            "P-1773428369",
+            "P-1773430091"
+        ]
+    },
+    "2c@c": {
+        "full_name": "Testing2",
+        "email": "2c@c",
+        "password": "2",
+        "patient_ids": [
+            "P-1773428369",
+            "P-1773430091"
+        ]
+    },
+    "b@b": {
+        "full_name": "testing",
+        "email": "b@b",
+        "password": "b",
+        "patient_ids": []
+    }
+}

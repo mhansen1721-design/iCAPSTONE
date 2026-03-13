@@ -1,101 +1,62 @@
 {
-    "t@gmail": {
-        "full_name": "T",
-        "email": "t@gmail",
-        "password": "t",
-        "patients": []
-    },
-    "1@t": {
-        "full_name": "Test",
-        "email": "1@t",
-        "password": "1",
-        "patients": [
+    "P-1773428369": {
+        "patient_id": "P-1773428369",
+        "full_name": "Care Circle Test",
+        "age": 20,
+        "dementia_stage": "Early Stage (Mild)",
+        "patient_story": "",
+        "hobbies_and_career": "",
+        "avatarType": "axolotl",
+        "key_people": [
             {
-                "patient_id": "2b9050dd-4d10-414c-8901-b81c81f9279d",
-                "full_name": "test",
-                "age": 0,
-                "dementia_stage": "Middle Stage (Moderate)",
-                "patient_story": "t",
-                "hobbies_and_career": "",
-                "key_people": [],
-                "approved_topics": [],
-                "known_triggers": []
+                "name": "mom",
+                "relation": "mom"
             }
+        ],
+        "approved_topics": [
+            "2",
+            "2",
+            "2"
+        ],
+        "known_triggers": [
+            "2",
+            "2",
+            "2"
+        ],
+        "access_code": "6V80YL",
+        "authorized_users": [
+            "new@care",
+            "2c@c"
         ]
     },
-    "m@h": {
-        "full_name": "m",
-        "email": "m@h",
-        "password": "m",
-        "patients": [
+    "P-1773430091": {
+        "patient_id": "P-1773430091",
+        "full_name": "another",
+        "age": 1,
+        "dementia_stage": "Early Stage (Mild)",
+        "patient_story": "",
+        "hobbies_and_career": "",
+        "avatarType": "jellyfish",
+        "key_people": [
             {
-                "patient_id": "604db64d-592f-4d6f-8518-558583152f6b",
-                "full_name": "2",
-                "age": 12,
-                "dementia_stage": "Early Stage (Mild)",
-                "patient_story": "",
-                "hobbies_and_career": "",
-                "key_people": [],
-                "approved_topics": [],
-                "known_triggers": []
+                "name": "testing",
+                "relation": "again"
             }
-        ]
-    },
-    "t@t": {
-        "full_name": "T",
-        "email": "t@t",
-        "password": "T",
-        "patients": [
-            {
-                "patient_id": "95d6996f-d5b3-491b-8b95-a46f9263bde9",
-                "full_name": "Testing10",
-                "age": 20,
-                "dementia_stage": "Middle Stage (Moderate)",
-                "patient_story": "",
-                "hobbies_and_career": "",
-                "avatarType": "panda",
-                "key_people": [
-                    {
-                        "name": "2",
-                        "relation": "2"
-                    }
-                ],
-                "approved_topics": [
-                    "2",
-                    "2",
-                    "2"
-                ],
-                "known_triggers": [
-                    "2",
-                    "2",
-                    "2"
-                ]
-            },
-            {
-                "patient_id": "P-1773283213",
-                "full_name": "Testing",
-                "age": 12,
-                "dementia_stage": "Middle Stage (Moderate)",
-                "patient_story": "",
-                "hobbies_and_career": "",
-                "avatarType": "jellyfish",
-                "key_people": [
-                    {
-                        "name": "test",
-                        "relation": "test"
-                    }
-                ],
-                "approved_topics": [
-                    "testing",
-                    "yesti",
-                    "trea"
-                ],
-                "known_triggers": [
-                    "tre",
-                    "rgwea",
-                    "graw"
-                ]
-            }
+        ],
+        "approved_topics": [
+            "2",
+            "2",
+            "2"
+        ],
+        "known_triggers": [
+            "2",
+            "2",
+            "2"
+        ],
+        "access_code": "0LLNOF",
+        "authorized_users": [
+            "2c@c",
+            "new@care"
         ]
     }
 }

@@ -74,3 +74,4 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
     </div>
   );
 };
+
