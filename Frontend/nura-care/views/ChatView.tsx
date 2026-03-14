@@ -160,6 +160,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
       content: m.text,
     }));
 
+  /**
+   * Lightweight client-side tier detection — mirrors the keyword sets in llm_chat.py.
+   * The backend will re-validate, but sending a tier hint skips one round-trip of
+   * keyword scanning and lets the backend fast-path Tier 3 immediately.
+   */
+  const detectTier = (text: string): 1 | 2 | 3 => {
+    const lower = text.toLowerCase();
+    const tier3Keywords = [
+      "fell", "can't move", "cannot move", "chest hurts", "chest pain",
+      "can't breathe", "cannot breathe", "fire", "smoke", "burning",
+      "kill myself", "want to die", "end my life", "suicide",
+      "too many pills", "overdose", "took too many", "help me",
+      "i'm bleeding", "not breathing", "unconscious", "emergency",
+    ];
+    const tier2Keywords = [
+      "scared", "afraid", "anxious", "panic", "frustrated", "angry",
+      "furious", "upset", "lonely", "alone", "nobody cares", "no one cares",
+      "burden", "better off without me", "crying", "can't stop crying",
+      "lost my mind", "losing my mind", "miserable", "worried",
+    ];
+    if (tier3Keywords.some(kw => lower.includes(kw))) return 3;
+    if (tier2Keywords.some(kw => lower.includes(kw))) return 2;
+    return 1;
+  };
+
   const handleSendMessage = async (text?: string) => {
     const val = (text || inputText).trim();
     if (!val) return;
@@ -186,9 +211,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patient_id:   patient.patient_id || (patient as any).id,
-          user_input:   val,
-          chat_history: buildHistoryPayload(messagesRef.current),
+          patient_id:    patient.patient_id || (patient as any).id,
+          user_input:    val,
+          chat_history:  buildHistoryPayload(messagesRef.current),
+          detected_tier: detectTier(val),   // client hint; backend re-validates
         }),
       });
 

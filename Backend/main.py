@@ -194,7 +194,8 @@ class ClaimRequest(BaseModel):
 class ChatRequest(BaseModel):
     patient_id: str
     user_input: str
-    chat_history: list = []   # [{"role": "user"|"assistant", "content": str}, …]
+    chat_history: list = []          # [{"role": "user"|"assistant", "content": str}, …]
+    detected_tier: Optional[int] = None  # 1 | 2 | 3 — client-detected; auto-detected if omitted
 
 
 # ─────────────────────────────────────────────
@@ -684,11 +685,12 @@ async def chat_respond(data: ChatRequest):
     }
 
     payload = {
-        "patient_id":   data.patient_id,
-        "user_input":   data.user_input,
-        "patient_info": patient_info,
-        "chat_history": data.chat_history,
-        # tier is auto-detected inside llm_chat when not supplied
+        "patient_id":    data.patient_id,
+        "user_input":    data.user_input,
+        "patient_info":  patient_info,
+        "chat_history":  data.chat_history,
+        # Use client-supplied tier when present; llm_chat auto-detects if None
+        **({"detected_tier": data.detected_tier} if data.detected_tier is not None else {}),
     }
 
     try:

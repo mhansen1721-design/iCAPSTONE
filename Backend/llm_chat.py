@@ -28,26 +28,13 @@ _pipeline: Any = None
 def get_pipeline():
     global _pipeline
     if _pipeline is None:
-        import torch
-        from transformers import pipeline          # deferred so import is fast
-        logger.info("[LLM] Loading Qwen2.5-3B-Instruct — this takes ~30s on first call …")
-
-        # Pick the best available device automatically
-        if torch.backends.mps.is_available():
-            device = "mps"          # Apple Silicon GPU — fastest on Mac
-            logger.info("[LLM] Using Apple Metal (MPS) GPU")
-        elif torch.cuda.is_available():
-            device = "cuda"         # NVIDIA GPU
-            logger.info("[LLM] Using CUDA GPU")
-        else:
-            device = "cpu"
-            logger.info("[LLM] Using CPU — responses will be slow (~20s each)")
+        from transformers import pipeline
+        logger.info("[LLM] Loading Qwen2.5-0.5B-Instruct on CPU …")
 
         _pipeline = pipeline(
             "text-generation",
-            model="Qwen/Qwen2.5-1.5B-Instruct",
-            device=device,
-            torch_dtype=torch.float16 if device != "cpu" else torch.float32,
+            model="Qwen/Qwen2.5-0.5B-Instruct",
+            device_map="auto",   # uses GPU if available, falls back to CPU automatically
         )
         logger.info("[LLM] Model ready.")
     return _pipeline
@@ -248,28 +235,46 @@ def generate_response(payload: dict) -> dict:
             "log_entry": "TIER-3: Emergency detected — caregiver alert triggered immediately",
         }
 
-    # ── Build messages for the model ─────────────────────────────────────────
-    system_prompt = _build_system_prompt(patient_info, tier)
+    # ── Build prompt using <|im_start|> chat template ────────────────────────
+    patient_name = patient_info.get("name") or "my friend"
 
-    # Format last 6 turns of chat history as readable context
-    history_lines = []
-    for msg in chat_history[-6:]:
-        role    = "Patient"    if msg.get("role") == "user" else "Companion"
-        content = msg.get("content", "").strip()
-        if content:
-            history_lines.append(f"{role}: {content}")
-    history_block = "\n".join(history_lines)
+    _tier_instructions = {
+        1: (
+            "Focus: Validation and Redirection. "
+            "Acknowledge feelings and gently shift to a safe topic from the patient's interests."
+        ),
+        2: (
+            "Focus: Emotional Support. "
+            "Use deep empathy. Do not redirect yet — sit with their frustration or sadness first."
+        ),
+        3: (
+            "Focus: Emergency Protocol. "
+            "Be calm and brief. Inform them help is being notified. ui_signal MUST be 'ALERT'."
+        ),
+    }
 
-    user_message = (
-        f"Recent conversation:\n{history_block}\n\n"
-        f"Patient just said: \"{user_input}\"\n\n"
-        f"Respond as the companion. Output JSON only."
+    system_prompt = (
+        f"<|im_start|>system\n"
+        f"You are Nura, an empathetic AI companion for {patient_name} who has dementia.\n"
+        f"Your response must be a single JSON object. No prose, no markdown fences outside the JSON.\n"
+        f"{_tier_instructions.get(tier, _tier_instructions[1])}\n"
+        f"SCHEMA:\n"
+        f'{{\n'
+        f'  "response_text": "string (warm spoken reply — 2-3 sentences max)",\n'
+        f'  "ui_signal": "string (NONE | REDIRECT | ALERT)",\n'
+        f'  "log_entry": "string (one-line clinical tag for caregiver logs)"\n'
+        f"}}\n"
+        f"<|im_end|>\n"
     )
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user",   "content": user_message},
-    ]
+    user_context = (
+        f"<|im_start|>user\n"
+        f"Input: {json.dumps(payload)}\n"
+        f"<|im_end|>\n"
+        f"<|im_start|>assistant\n"
+    )
+
+    full_prompt = system_prompt + user_context
 
     # ── Call the model ───────────────────────────────────────────────────────
     try:
@@ -284,15 +289,14 @@ def generate_response(payload: dict) -> dict:
         )
 
         output = generator(
-            messages,
+            full_prompt,
             generation_config=gen_config,
             return_full_text=False,
         )
 
-        raw = output[0]["generated_text"]
-        # Chat-format models return a list of message dicts
-        if isinstance(raw, list):
-            raw = raw[-1].get("content", "") if raw else ""
+        raw = output[0]["generated_text"].strip()
+        # Strip markdown code fences the model sometimes adds
+        raw = raw.replace("```json", "").replace("```", "").strip()
 
         return _parse(raw)
 
