@@ -45,7 +45,7 @@ def get_pipeline():
 
         _pipeline = pipeline(
             "text-generation",
-            model="Qwen/Qwen2.5-3B-Instruct",
+            model="Qwen/Qwen2.5-1.5B-Instruct",
             device=device,
             torch_dtype=torch.float16 if device != "cpu" else torch.float32,
         )
@@ -273,18 +273,24 @@ def generate_response(payload: dict) -> dict:
 
     # ── Call the model ───────────────────────────────────────────────────────
     try:
+        from transformers import GenerationConfig
         generator = get_pipeline()
-        output    = generator(
-            messages,
+
+        gen_config = GenerationConfig(
             max_new_tokens=220,
             do_sample=True,
             temperature=0.65,
             repetition_penalty=1.1,
+        )
+
+        output = generator(
+            messages,
+            generation_config=gen_config,
             return_full_text=False,
         )
 
         raw = output[0]["generated_text"]
-        # Chat-format models sometimes return a list of message dicts
+        # Chat-format models return a list of message dicts
         if isinstance(raw, list):
             raw = raw[-1].get("content", "") if raw else ""
 

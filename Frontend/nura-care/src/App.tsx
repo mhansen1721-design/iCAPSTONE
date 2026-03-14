@@ -38,9 +38,15 @@ export default function App() {
   const [caregiverPassword, setCaregiverPassword] = useState<string>('');
   const [chatDuration, setChatDuration] = useState<number>(15);
 
+  // Care Center empty-state join modal
+  const [showCareCenterEmptyModal, setShowCareCenterEmptyModal] = useState(false);
+  const [emptyModalJoinCode, setEmptyModalJoinCode] = useState('');
+  const [emptyModalJoinError, setEmptyModalJoinError] = useState<string | null>(null);
+  const [emptyModalJoinLoading, setEmptyModalJoinLoading] = useState(false);
+
   const [appSettings, setAppSettings] = useState<AppSettings>({
     fontSize: 'medium',
-    colorPalette: 'twilight',
+    colorPalette: 'default',
     reducedMotion: false
   });
 
@@ -117,6 +123,7 @@ export default function App() {
   }, [refreshKey]);
 
   // --- 3. HANDLERS ---
+
   const handleLogin = (email: string, password?: string) => {
     const cleanEmail = email.toLowerCase().trim();
     setCaregiverEmail(cleanEmail);
@@ -126,7 +133,7 @@ export default function App() {
     if (saved) {
       try { setAppSettings(JSON.parse(saved)); } catch { }
     } else {
-      setAppSettings({ fontSize: 'medium', colorPalette: 'twilight', reducedMotion: false });
+      setAppSettings({ fontSize: 'medium', colorPalette: 'default', reducedMotion: false });
     }
     setView('ROLE_SELECTION');
   };
@@ -158,8 +165,14 @@ export default function App() {
     setView(userRole === 'patient' ? 'PATIENT_PICKER' : 'DASHBOARD');
   };
 
-  // Opens CareCenter; if no id supplied, defaults to first patient inside CareCenter
+  // Opens CareCenter; if no patients exist, shows the empty-state modal instead
   const handleOpenCareCenter = (patientId?: string) => {
+    if (patients.length === 0) {
+      setEmptyModalJoinCode('');
+      setEmptyModalJoinError(null);
+      setShowCareCenterEmptyModal(true);
+      return;
+    }
     setCareCenterPatientId(patientId || null);
     setView('CARE_CENTER');
   };
@@ -172,6 +185,39 @@ export default function App() {
 
   const handleJoinSuccess = () => {
     setRefreshKey((k) => k + 1);
+  };
+
+  const handleEmptyModalJoin = async () => {
+    if (!emptyModalJoinCode.trim() || emptyModalJoinLoading) return;
+    setEmptyModalJoinLoading(true);
+    setEmptyModalJoinError(null);
+    try {
+      const res = await fetch('http://127.0.0.1:8000/patients/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: caregiverEmail.toLowerCase().trim(),
+          access_code: emptyModalJoinCode.trim().toUpperCase(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShowCareCenterEmptyModal(false);
+        setEmptyModalJoinCode('');
+        setRefreshKey(k => k + 1);
+        // Brief delay so patients state refreshes before navigating
+        setTimeout(() => {
+          setCareCenterPatientId(data.patient_id || null);
+          setView('CARE_CENTER');
+        }, 400);
+      } else {
+        setEmptyModalJoinError(data.detail || 'Invalid code. Please try again.');
+      }
+    } catch {
+      setEmptyModalJoinError('Could not connect to server.');
+    } finally {
+      setEmptyModalJoinLoading(false);
+    }
   };
 
   // --- 4. RENDER ---
@@ -322,6 +368,80 @@ export default function App() {
           />
         )}
 
+        {/* ── CARE CENTER EMPTY-STATE MODAL ── */}
+        {/* Shown when a caregiver with no patients clicks Care Center */}
+        {showCareCenterEmptyModal && (
+          <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
+            <div className="bg-[var(--nura-bg)] border border-white/10 rounded-[2.5rem] max-w-md w-full shadow-2xl p-10 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+
+              {/* Header */}
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--nura-accent)]/15 border border-[var(--nura-accent)]/30 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">🏥</span>
+                </div>
+                <h2 className="text-3xl font-black tracking-tight text-[var(--nura-text)]">
+                  Welcome to Care Center
+                </h2>
+                <p className="text-sm text-[var(--nura-text)]/50 mt-2 font-medium">
+                  You don't have any patients yet. Get started below.
+                </p>
+              </div>
+
+              {/* Option 1 — Create profile */}
+              <button
+                onClick={() => {
+                  setShowCareCenterEmptyModal(false);
+                  setEditingPatientId(null);
+                  setView('CONFIG');
+                }}
+                className="w-full py-5 px-6 rounded-2xl bg-[var(--nura-accent)] hover:opacity-90 active:scale-95 transition-all flex items-center justify-between group shadow-lg"
+              >
+                <div className="text-left">
+                  <p className="font-black text-[var(--nura-bg)] text-base tracking-tight">Create Patient Profile</p>
+                  <p className="text-xs text-[var(--nura-bg)]/70 font-medium mt-0.5">Set up a new patient from scratch</p>
+                </div>
+                <span className="text-2xl group-hover:translate-x-1 transition-transform">→</span>
+              </button>
+
+              {/* Option 2 — Join via code */}
+              <div className="flex flex-col gap-3">
+                <p className="text-xs font-black uppercase tracking-widest text-[var(--nura-text)]/40 text-center">
+                  — or join an existing care circle —
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={emptyModalJoinCode}
+                    onChange={e => { setEmptyModalJoinCode(e.target.value.toUpperCase()); setEmptyModalJoinError(null); }}
+                    onKeyDown={e => e.key === 'Enter' && handleEmptyModalJoin()}
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
+                    className="flex-1 bg-[var(--nura-card)] border border-white/10 rounded-2xl px-5 py-4 text-[var(--nura-text)] font-black text-lg tracking-[0.3em] text-center placeholder:tracking-normal placeholder:font-medium placeholder:text-sm focus:outline-none focus:border-[var(--nura-accent)]/50"
+                  />
+                  <button
+                    onClick={handleEmptyModalJoin}
+                    disabled={emptyModalJoinCode.length < 4 || emptyModalJoinLoading}
+                    className="px-6 py-4 rounded-2xl bg-[var(--nura-card)] border border-white/10 hover:bg-[var(--nura-accent)]/20 disabled:opacity-30 transition-all font-black text-[var(--nura-text)]"
+                  >
+                    {emptyModalJoinLoading ? '…' : 'Join'}
+                  </button>
+                </div>
+                {emptyModalJoinError && (
+                  <p className="text-red-400 text-xs font-bold text-center">{emptyModalJoinError}</p>
+                )}
+              </div>
+
+              {/* Close */}
+              <button
+                onClick={() => setShowCareCenterEmptyModal(false)}
+                className="text-xs text-[var(--nura-text)]/30 hover:text-[var(--nura-text)]/60 font-bold uppercase tracking-widest transition-colors text-center"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {view === 'LOGS' && (
           <SessionLogs logs={sessionLogs} onBack={() => setView('DASHBOARD')} isSubView={false} />
         )}
@@ -329,3 +449,4 @@ export default function App() {
     </main>
   );
 }
+

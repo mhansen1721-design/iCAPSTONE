@@ -4,13 +4,50 @@ import shutil
 import datetime
 import random
 import string
+import threading
+import logging
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 
+logger = logging.getLogger("nura.main")
+
 app = FastAPI()
+
+# ─────────────────────────────────────────────
+# LLM LOAD STATE
+# Model is NOT loaded at startup — it loads on first chat session.
+# Call GET /llm/warmup to trigger loading in the background.
+# Poll GET /llm/status to check progress.
+# ─────────────────────────────────────────────
+_llm_load_error: str | None = None
+_llm_loading: bool = False   # True while the background thread is running
+
+def _load_llm_background():
+    """Loads the model in a background thread. Safe to call multiple times."""
+    global _llm_load_error, _llm_loading
+    if _llm_loading:
+        return   # already in progress — don't start a second thread
+    _llm_loading = True
+    try:
+        import llm_chat
+        if llm_chat._pipeline is not None:
+            return   # already loaded
+        try:
+            import os as _os
+            _os.nice(10)   # lower CPU priority so API stays responsive
+        except Exception:
+            pass
+        logger.info("[LLM] Loading model in background thread …")
+        llm_chat.get_pipeline()
+        logger.info("[LLM] Model ready.")
+    except Exception as exc:
+        _llm_load_error = str(exc)
+        logger.error("[LLM] Failed to load: %s", exc)
+    finally:
+        _llm_loading = False
 
 app.add_middleware(
     CORSMiddleware,
@@ -729,4 +766,39 @@ def delete_caregiver_account(data: dict):
                 patients_db[pid]["authorized_users"] = authorized
     save_json(PATIENTS_FILE, patients_db)
     return {"success": True}
+
+@app.get("/llm/warmup")
+def llm_warmup():
+    """
+    Triggers background model loading without blocking.
+    Call this when the user enters the chat screen.
+    Returns immediately — poll /llm/status to check progress.
+    """
+    if _llm_load_error:
+        return {"status": "error", "detail": _llm_load_error}
+    try:
+        import llm_chat
+        if llm_chat._pipeline is not None:
+            return {"status": "ready"}
+    except Exception:
+        pass
+    threading.Thread(target=_load_llm_background, daemon=True).start()
+    return {"status": "loading"}
+
+
+@app.get("/llm/status")
+def llm_status():
+    """
+    Returns the current state of the Qwen model pipeline.
+      loading  – model is not yet loaded (warmup not called, or still in progress)
+      ready    – model is loaded and ready
+      error    – model failed to load (check server logs)
+    """
+    if _llm_load_error:
+        return {"status": "error", "detail": _llm_load_error}
+    try:
+        import llm_chat
+        return {"status": "ready" if llm_chat._pipeline is not None else "loading"}
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
     

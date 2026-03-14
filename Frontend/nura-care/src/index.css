@@ -1,10 +1,10 @@
-/* 1. THEME DEFINITIONS (The Brain) */
+/* DEFAULT THEME: STARK LIGHT */
 :root {
-  --nura-bg: #E3D5FF !important;     /* Very pale lavender */
-  --nura-card: #FFFFFF !important;   
-  --nura-accent: #6231C6 !important; 
-  --nura-text: #2D1B33 !important;   
-  --nura-dim: #6A1B9A !important;    
+  --nura-bg: #FFFFFF !important;      /* Pure White Background */
+  --nura-card: #F4F4F5 !important;    /* Soft Grey Boxes (Zinc-100) */
+  --nura-accent: #18181B !important;  /* Charcoal/Black Accents */
+  --nura-text: #09090B !important;    /* Deep Black Text */
+  --nura-dim: #71717A !important;     /* Muted Grey for secondary text */
 }
 
 /* --- SERENE NATURE (Mint/Earth Tones) --- */
@@ -16,7 +16,7 @@
   --nura-dim: #3d4545 !important;
 }
 
-/* --- TWILIGHT (Purple/Sunset) --- */
+/* --- DEEP SPACE (Dark Mode) --- */
 .theme-deep-space {
   --nura-bg: #171140 !important;
   --nura-card: rgba(255, 255, 255, 0.05) !important;
@@ -25,21 +25,29 @@
   --nura-dim: rgba(172, 203, 255, 0.6) !important;
 }
 
-/* --- HIGH-CLARITY (True Contrast) --- */
-.theme-high-clarity {
-  --nura-bg: #000000 !important;
-  --nura-card: #1A202C !important;
-  --nura-accent: #f1bd00 !important; /* High-viz Green */
-  --nura-text: #c9c0c0 !important;
-  --nura-dim: #B0BEC5 !important;
-}
-
+/* --- TWILIGHT (Lavender) --- */
 .theme-twilight {
   --nura-bg: #E3D5FF !important;
   --nura-card: #FFFFFF !important;
   --nura-accent: #6231C6 !important;
   --nura-text: #2D1B33 !important;
   --nura-dim: #6A1B9A !important;
+}
+
+/* --- HIGH-CLARITY (True Contrast) --- */
+.theme-high-clarity {
+  --nura-bg: #000000 !important;
+  --nura-card: #1A202C !important;
+  --nura-accent: #f1bd00 !important;
+  --nura-text: #c9c0c0 !important;
+  --nura-dim: #B0BEC5 !important;
+}
+.theme-default {
+  --nura-bg: #FFFFFF !important;      /* Pure White Background */
+  --nura-card: #F4F4F5 !important;    /* Soft Grey Boxes (Zinc-100) */
+  --nura-accent: #18181B !important;  /* Charcoal/Black Accents */
+  --nura-text: #09090B !important;    /* Deep Black Text */
+  --nura-dim: #71717A !important;     /* Muted Grey for secondary text */
 }
 
 /* 2. GLOBAL APPLICATION (The Muscles) */
@@ -49,7 +57,6 @@ html, body, #root, main {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  transition: background-color 0.5s ease, color 0.5s ease;
   font-family: 'Inter', system-ui, sans-serif;
 }
 
@@ -85,4 +92,11 @@ html, body, #root, main {
 /* This fixes the icons (Lucide icons use 'stroke') */
 [class*="text-indigo-"] path, [class*="text-purple-"] path {
   stroke: var(--nura-accent) !important;
+}
+
+/* Enhance Card Visibility for Light Mode */
+[class*="bg-[var(--nura-card)]"] {
+  background-color: var(--nura-card) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
 }

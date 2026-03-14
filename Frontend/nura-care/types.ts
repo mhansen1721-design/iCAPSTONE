@@ -96,6 +96,6 @@ export type ViewState =
 
 export interface AppSettings {
   fontSize: 'small' | 'medium' | 'large';
-  colorPalette: 'deep-space' | 'serene-nature' | 'high-clarity' | 'twilight';
+  colorPalette: 'deep-space' | 'serene-nature' | 'high-clarity' | 'twilight' | 'default';
   reducedMotion: boolean;
 }

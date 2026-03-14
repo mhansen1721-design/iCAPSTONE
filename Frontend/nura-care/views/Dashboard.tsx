@@ -130,33 +130,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleJoinCareCircle = async () => {
-    if (!joinCode.trim()) return;
-    setIsJoining(true);
-    setJoinError(null);
-    setJoinSuccess(null);
-    try {
-      const res = await fetch('http://127.0.0.1:8000/patients/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: caregiverEmail, access_code: joinCode.trim().toUpperCase() })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setJoinSuccess(`You've joined ${data.patient_name}'s care circle!`);
-        setJoinCode('');
-        onJoinSuccess();
-        setTimeout(() => { setShowJoinModal(false); setJoinSuccess(null); }, 2000);
-      } else {
-        setJoinError(data.detail || 'Invalid access code. Please try again.');
-      }
-    } catch {
-      setJoinError('Could not connect to server.');
-    } finally {
-      setIsJoining(false);
-    }
-  };
-
   // Clicking a patient card goes directly to Configure
   const handlePatientCardClick = (id: string) => {
     if (onConfigPatient) {
@@ -263,13 +236,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
           <button onClick={onViewLogs} className="p-2.5 bg-[var(--nura-card)] hover:bg-[var(--nura-accent)]/20 rounded-full border border-white/10 transition-all text-[var(--nura-dim)] hover:text-[var(--nura-text)]">
             <SettingsIcon size={20} />
-          </button>
-          <button
-            onClick={() => { setShowJoinModal(true); setJoinError(null); setJoinSuccess(null); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--nura-accent)]/10 hover:bg-[var(--nura-accent)]/20 border border-[var(--nura-accent)]/20 rounded-xl text-[var(--nura-accent)] text-sm font-bold transition-all"
-          >
-            <KeyRound size={16} />
-            Join Circle
           </button>
         </div>
 

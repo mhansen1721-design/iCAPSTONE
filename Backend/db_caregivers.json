@@ -30,5 +30,19 @@
         "patient_ids": [
             "P-1773428369"
         ]
+    },
+    "colour@testing": {
+        "full_name": "Colour",
+        "email": "colour@testing",
+        "password": "c",
+        "patient_ids": []
+    },
+    "testing@colour": {
+        "full_name": "colour",
+        "email": "testing@colour",
+        "password": "t",
+        "patient_ids": [
+            "P-1773430091"
+        ]
     }
 }

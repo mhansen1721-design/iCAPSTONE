@@ -39,7 +39,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [llmStatus, setLlmStatus] = useState<'loading' | 'ready' | 'offline'>('loading');
+  const [llmStatus, setLlmStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
 
   // Alert state — set when LLM returns ui_signal "ALERT"
   const [emergencyAlert, setEmergencyAlert] = useState<string | null>(null);
@@ -55,40 +55,34 @@ export const ChatView: React.FC<ChatViewProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, currentTranscript, isAiTyping]);
 
-  // Warm-up ping — triggers model loading on the server immediately
+  // On mount: trigger model loading via /llm/warmup (non-blocking).
+  // Then poll /llm/status every 5s until ready.
+  // Only 'ready' stops polling — all other states keep retrying.
   useEffect(() => {
-    const warmUp = async () => {
+    // Kick off model loading the moment the user enters the chat screen
+    fetch('http://127.0.0.1:8000/llm/warmup').catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (llmStatus === 'ready') return;
+
+    const checkStatus = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/chat/respond', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patient_id:   patient.patient_id || (patient as any).id || 'warmup',
-            user_input:   'hello',
-            chat_history: [],
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          // If we got a real LLM response (not a template fallback), mark as ready
-          // Template fallbacks contain "I'm right here" or similar fixed phrases
-          const isTemplate = !data.response_text || data.log_entry?.includes('fallback') || data.log_entry?.includes('error');
-          setLlmStatus(isTemplate ? 'loading' : 'ready');
-        } else {
-          setLlmStatus('offline');
-        }
+        const res = await fetch('http://127.0.0.1:8000/llm/status');
+        if (!res.ok) { setLlmStatus('offline'); return; }
+        const { status } = await res.json();
+        if (status === 'ready') setLlmStatus('ready');
+        else if (status === 'error') setLlmStatus('error');
+        else setLlmStatus('loading');
       } catch {
         setLlmStatus('offline');
       }
     };
-    warmUp();
-    // Re-check every 30s until LLM is ready
-    const interval = setInterval(async () => {
-      if (llmStatus === 'ready') { clearInterval(interval); return; }
-      await warmUp();
-    }, 30_000);
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 5_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [llmStatus]);
 
   // Session timer — fires handleFinalExit with "completed" when clock runs out
   useEffect(() => {
@@ -343,14 +337,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border ${
           llmStatus === 'ready'
             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-            : llmStatus === 'offline'
+            : llmStatus === 'offline' || llmStatus === 'error'
             ? 'bg-red-500/10 border-red-500/30 text-red-400'
             : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
         }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${
-            llmStatus === 'ready' ? 'bg-emerald-400' : llmStatus === 'offline' ? 'bg-red-400' : 'bg-amber-400 animate-pulse'
+            llmStatus === 'ready' ? 'bg-emerald-400'
+            : llmStatus === 'offline' || llmStatus === 'error' ? 'bg-red-400'
+            : 'bg-amber-400 animate-pulse'
           }`} />
-          {llmStatus === 'ready' ? 'AI Ready' : llmStatus === 'offline' ? 'AI Offline' : 'AI Loading…'}
+          {llmStatus === 'ready' ? 'AI Ready'
+            : llmStatus === 'offline' ? 'AI Offline'
+            : llmStatus === 'error' ? 'AI Error — check server logs'
+            : 'AI Loading…'}
         </div>
         <button 
           onClick={() => setShowExitConfirm(true)} 
