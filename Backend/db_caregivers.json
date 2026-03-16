@@ -44,5 +44,37 @@
         "patient_ids": [
             "P-1773430091"
         ]
+    },
+    "c@c": {
+        "full_name": "Cher",
+        "email": "c@c",
+        "password": "c",
+        "patient_ids": [
+            "P-1773428369"
+        ]
+    },
+    "demo@gmail.com": {
+        "full_name": "John",
+        "email": "demo@gmail.com",
+        "password": "d",
+        "patient_ids": [
+            "P-1773693249"
+        ]
+    },
+    "nick@gmail.com": {
+        "full_name": "Nick",
+        "email": "nick@gmail.com",
+        "password": "n",
+        "patient_ids": [
+            "P-1773693249"
+        ]
+    },
+    "cher@gmail.com": {
+        "full_name": "Cher",
+        "email": "cher@gmail.com",
+        "password": "c",
+        "patient_ids": [
+            "P-1773693249"
+        ]
     }
 }

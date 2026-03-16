@@ -1,6 +1,6 @@
 {
     "P-1773428369": {
-        "full_name": "Care Circle",
+        "full_name": "Cher",
         "sessions": [
             {
                 "timestamp": "2026-03-13 15:19:33",
@@ -110,6 +110,12 @@
                         "timestamp": "2026-03-14T04:57:07.572Z"
                     }
                 ]
+            },
+            {
+                "timestamp": "2026-03-16 16:30:07",
+                "logged_by": "c@c",
+                "end_reason": "early",
+                "transcript": []
             }
         ]
     },
@@ -130,6 +136,223 @@
                         "sender": "ai",
                         "text": "I understand that's confusing. Let me help you find your name.",
                         "timestamp": "2026-03-14T04:57:34.359Z"
+                    }
+                ]
+            }
+        ]
+    },
+    "P-1773693249": {
+        "full_name": "Dad",
+        "sessions": [
+            {
+                "timestamp": "2026-03-16 17:02:20",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Let's talk about gardening",
+                        "timestamp": "2026-03-16T21:00:30.865Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Okay, let's talk about gardening.",
+                        "timestamp": "2026-03-16T21:00:36.570Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "what plants are good to grow in winter",
+                        "timestamp": "2026-03-16T21:00:49.905Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I understand that you're interested in growing some winter-friendly plants. Let's discuss a few options.",
+                        "timestamp": "2026-03-16T21:00:56.957Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "list a few options",
+                        "timestamp": "2026-03-16T21:01:05.235Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I'm glad we found something to discuss today! How about we start by exploring some of the winter-friendly plants that might do well together?",
+                        "timestamp": "2026-03-16T21:01:14.066Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "sure",
+                        "timestamp": "2026-03-16T21:01:19.319Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Sure, how about we start by exploring some of the winter-friendly plants that might do well together?",
+                        "timestamp": "2026-03-16T21:01:26.161Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "yes what are some?",
+                        "timestamp": "2026-03-16T21:02:04.104Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I'm glad we found something to discuss today! How about we start by exploring some of the winter-friendly plants that might do well together?",
+                        "timestamp": "2026-03-16T21:02:14.872Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-16 17:09:20",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "completed",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Let's talk about baseball",
+                        "timestamp": "2026-03-16T21:05:52.416Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Okay, let's get started discussing baseball.",
+                        "timestamp": "2026-03-16T21:05:58.515Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "what does the pitcher do",
+                        "timestamp": "2026-03-16T21:06:15.205Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "The pitcher throws the ball towards home plate while trying to throw it over the fence for an out.",
+                        "timestamp": "2026-03-16T21:06:22.821Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-16 17:16:53",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "I like beaches",
+                        "timestamp": "2026-03-16T21:13:49.793Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "The patient mentioned liking beaches. Is there anything else you'd like to know?",
+                        "timestamp": "2026-03-16T21:13:57.098Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "who was last at the beach",
+                        "timestamp": "2026-03-16T21:14:07.339Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "The patient mentioned 'last' at the beach. Was this someone specific?",
+                        "timestamp": "2026-03-16T21:14:12.440Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-16 17:21:45",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "What is the weather like",
+                        "timestamp": "2026-03-16T21:19:43.807Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Hey Dad! What\u2019s the current weather out? I\u2019m here to help.",
+                        "timestamp": "2026-03-16T21:19:51.794Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "who was the beach last",
+                        "timestamp": "2026-03-16T21:20:03.456Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Hey Dad! What\u2019s the current weather out?",
+                        "timestamp": "2026-03-16T21:20:09.729Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "who did nick go to the beach with",
+                        "timestamp": "2026-03-16T21:20:20.578Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Hey Dad! Howdy!",
+                        "timestamp": "2026-03-16T21:20:26.846Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-16 17:45:54",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "i want to see pictures of the beach",
+                        "timestamp": "2026-03-16T21:45:30.770Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Sure thing! I can help find some beautiful photos for you.",
+                        "timestamp": "2026-03-16T21:45:36.735Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-16 18:00:26",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Let's talk about gardening",
+                        "timestamp": "2026-03-16T21:55:00.348Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Sure thing! What kind of advice do you need for today?",
+                        "timestamp": "2026-03-16T21:55:12.987Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "how to grow tomato",
+                        "timestamp": "2026-03-16T21:55:19.422Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "That's really interesting \u2014 tell me more, Dad.",
+                        "timestamp": "2026-03-16T21:55:38.198Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "how to grow tomato",
+                        "timestamp": "2026-03-16T21:59:04.484Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Tomatoes do best in a sunny spot. Pinch off the side shoots as they grow and they'll put all their energy into the fruit. Have you grown them before?",
+                        "timestamp": "2026-03-16T21:59:27.181Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "yes but its been a long time",
+                        "timestamp": "2026-03-16T21:59:40.651Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Tomato plants can be tricky! First things first - make sure there\u2019s plenty of sunlight for optimal growth.",
+                        "timestamp": "2026-03-16T22:00:05.321Z"
                     }
                 ]
             }

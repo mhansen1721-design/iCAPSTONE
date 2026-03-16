@@ -137,6 +137,17 @@ export const CareCenter: React.FC<CareCenterProps> = ({
   // ── Sessions state ────────────────────────────────────────────────────────
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
 
+  // ── Help requests view state ──────────────────────────────────────────────
+  // Default: hide "done" tasks. "all" view shows every status + filter pills.
+  const [showAllTasks, setShowAllTasks]           = useState(false);
+  const [taskFilter, setTaskFilter]               = useState<'all' | 'open' | 'claimed' | 'done'>('all');
+
+  // ── Journal view state ────────────────────────────────────────────────────
+  // Default: last 7 days only. "all" view adds search + category filter.
+  const [showAllJournal, setShowAllJournal]       = useState(false);
+  const [journalSearch, setJournalSearch]         = useState('');
+  const [journalTypeFilter, setJournalTypeFilter] = useState<JournalPost['type'] | 'all'>('all');
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const activePatient = patients.find(p => {
     const id = (p as any).patient_id || (p as any).id;
@@ -593,46 +604,97 @@ export const CareCenter: React.FC<CareCenterProps> = ({
                       <Plus size={16} />Post a Request
                     </button>
 
-                    {!data?.help_requests.length ? (
-                      <p className="text-center text-xs text-[var(--nura-dim)]/50 py-4">No requests yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {data.help_requests.map(req => {
-                          const sc = STATUS_CONFIG[req.status];
-                          const isAuthor = req.author_email === userEmail;
-                          const isClaimer = req.claimed_by === userEmail;
-                          return (
-                            <div key={req.request_id} className="bg-[var(--nura-bg)]/40 rounded-2xl border border-white/5 p-3.5">
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <p className="font-bold text-[var(--nura-text)] text-sm leading-tight">{req.title}</p>
-                                <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${sc.bg} ${sc.border} ${sc.color}`}>{sc.label}</span>
-                              </div>
-                              {req.description && <p className="text-[var(--nura-dim)] text-xs mb-2 leading-relaxed">{req.description}</p>}
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[9px] text-[var(--nura-dim)]/50 font-bold">
-                                  {isAuthor ? 'You' : req.author_name} · {fmt(req.timestamp)}
-                                </p>
-                                <div className="flex gap-1.5">
-                                  {req.status === 'open' && !isAuthor && (
-                                    <button onClick={() => handleClaimRequest(req.request_id)}
-                                      className="flex items-center gap-1 px-2.5 py-1 bg-[var(--nura-accent)]/15 hover:bg-[var(--nura-accent)]/25 text-[var(--nura-accent)] text-[9px] font-black uppercase tracking-widest rounded-lg transition-all border border-[var(--nura-accent)]/20">
-                                      <UserCheck size={10} />Claim
-                                    </button>
-                                  )}
-                                  {req.status === 'claimed' && (isClaimer || isAuthor) && (
-                                    <button onClick={() => handleCompleteRequest(req.request_id)}
-                                      className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all border border-emerald-500/20">
-                                      <CheckCircle2 size={10} />Done
-                                    </button>
-                                  )}
-                                  {req.status === 'done' && <span className="text-[9px] text-emerald-400/70 font-bold">✓ Done</span>}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                    {/* "View All" toggle — shows filter pills when expanded */}
+                    {!!data?.help_requests.length && (
+                      <div className="mb-3">
+                        <button
+                          onClick={() => { setShowAllTasks(v => !v); setTaskFilter('all'); }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[var(--nura-dim)] text-xs font-black uppercase tracking-widest transition-all"
+                        >
+                          <span>{showAllTasks ? 'Showing All Tasks' : 'Active Tasks Only'}</span>
+                          <ChevronDown size={13} className={`transition-transform duration-200 ${showAllTasks ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showAllTasks && (
+                          <div className="flex gap-1.5 mt-2 flex-wrap">
+                            {(['all', 'open', 'claimed', 'done'] as const).map(f => (
+                              <button
+                                key={f}
+                                onClick={() => setTaskFilter(f)}
+                                className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                  taskFilter === f
+                                    ? f === 'done'    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                                    : f === 'claimed' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                                    : f === 'open'    ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                                    : 'bg-white/15 border-white/20 text-[var(--nura-text)]'
+                                    : 'bg-white/5 border-white/10 text-[var(--nura-dim)] hover:bg-white/10'
+                                }`}
+                              >
+                                {f === 'all' ? 'All' : STATUS_CONFIG[f].label}
+                                {' '}
+                                <span className="opacity-60">
+                                  ({f === 'all' ? data!.help_requests.length : data!.help_requests.filter(r => r.status === f).length})
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
+
+                    {!data?.help_requests.length ? (
+                      <p className="text-center text-xs text-[var(--nura-dim)]/50 py-4">No requests yet</p>
+                    ) : (() => {
+                      // Filter logic: default hides "done"; "all" view uses taskFilter pill
+                      const visible = showAllTasks
+                        ? (taskFilter === 'all' ? data!.help_requests : data!.help_requests.filter(r => r.status === taskFilter))
+                        : data!.help_requests.filter(r => r.status !== 'done');
+
+                      if (!visible.length) return (
+                        <p className="text-center text-xs text-[var(--nura-dim)]/50 py-4">No tasks match this filter</p>
+                      );
+
+                      return (
+                        <div className="space-y-2">
+                          {visible.map(req => {
+                            const sc = STATUS_CONFIG[req.status];
+                            const isAuthor = req.author_email === userEmail;
+                            const isClaimer = req.claimed_by === userEmail;
+                            return (
+                              <div key={req.request_id} className={`bg-[var(--nura-bg)]/40 rounded-2xl border p-3.5 transition-all ${req.status === 'done' ? 'border-emerald-500/10 opacity-70' : 'border-white/5'}`}>
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <p className={`font-bold text-sm leading-tight ${req.status === 'done' ? 'line-through text-[var(--nura-dim)]' : 'text-[var(--nura-text)]'}`}>
+                                    {req.title}
+                                  </p>
+                                  <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${sc.bg} ${sc.border} ${sc.color}`}>{sc.label}</span>
+                                </div>
+                                {req.description && <p className="text-[var(--nura-dim)] text-xs mb-2 leading-relaxed">{req.description}</p>}
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-[9px] text-[var(--nura-dim)]/50 font-bold">
+                                    {isAuthor ? 'You' : req.author_name} · {fmt(req.timestamp)}
+                                  </p>
+                                  <div className="flex gap-1.5">
+                                    {req.status === 'open' && !isAuthor && (
+                                      <button onClick={() => handleClaimRequest(req.request_id)}
+                                        className="flex items-center gap-1 px-2.5 py-1 bg-[var(--nura-accent)]/15 hover:bg-[var(--nura-accent)]/25 text-[var(--nura-accent)] text-[9px] font-black uppercase tracking-widest rounded-lg transition-all border border-[var(--nura-accent)]/20">
+                                        <UserCheck size={10} />Claim
+                                      </button>
+                                    )}
+                                    {req.status === 'claimed' && (isClaimer || isAuthor) && (
+                                      <button onClick={() => handleCompleteRequest(req.request_id)}
+                                        className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all border border-emerald-500/20">
+                                        <CheckCircle2 size={10} />Done
+                                      </button>
+                                    )}
+                                    {req.status === 'done' && <span className="text-[9px] text-emerald-400/70 font-bold">✓ Completed</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -690,45 +752,159 @@ export const CareCenter: React.FC<CareCenterProps> = ({
                       <p className="text-[var(--nura-dim)] text-sm font-bold">No journal entries yet.</p>
                       <p className="text-[var(--nura-dim)]/50 text-xs mt-1">Post the first update above.</p>
                     </div>
-                  ) : (
-                    <div className="relative">
-                      <div className="absolute left-4 top-0 bottom-0 w-px bg-white/5" />
-                      <div className="space-y-4 pl-10">
-                        {data.journal.map(post => {
-                          const cfg = JOURNAL_TYPES[post.type] || JOURNAL_TYPES.update;
-                          const Icon = cfg.icon;
-                          const isYou = post.author_email === userEmail;
-                          return (
-                            <div key={post.entry_id} className="relative">
-                              <div className={`absolute -left-[1.75rem] top-4 w-2.5 h-2.5 rounded-full border-2 border-[var(--nura-card)] ${cfg.bg}`} />
-                              <div className="bg-[var(--nura-bg)]/40 rounded-2xl border border-white/5 p-4">
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className="w-7 h-7 rounded-full bg-[var(--nura-accent)]/20 flex items-center justify-center shrink-0">
-                                      <span className="text-[10px] font-black text-[var(--nura-accent)]">{initials(post.author_name)}</span>
-                                    </div>
-                                    <div>
-                                      <p className="font-bold text-[var(--nura-text)] text-sm leading-tight">
-                                        {post.author_name}
-                                        {isYou && <span className="ml-1 text-[9px] font-black text-[var(--nura-accent)]/70">(you)</span>}
-                                      </p>
-                                      <div className="flex items-center gap-1 text-[9px] text-[var(--nura-dim)]/50">
-                                        <Clock size={8} />{fmt(post.timestamp)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest shrink-0 ${cfg.bg} ${cfg.border} ${cfg.color}`}>
-                                    <Icon size={9} />{cfg.label}
-                                  </div>
-                                </div>
-                                <p className="text-[var(--nura-text)]/80 text-sm leading-relaxed">{post.content}</p>
-                              </div>
+                  ) : (() => {
+                    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+                    const now = Date.now();
+
+                    // Build the filtered list depending on mode
+                    let filtered = data.journal;
+
+                    if (!showAllJournal) {
+                      // Default: last 7 days only
+                      filtered = filtered.filter(p => {
+                        const d = new Date(String(p.timestamp).replace(/-/g, '/'));
+                        return !isNaN(d.getTime()) && now - d.getTime() <= ONE_WEEK_MS;
+                      });
+                    } else {
+                      // All-entries mode: apply search + type filter
+                      if (journalTypeFilter !== 'all') {
+                        filtered = filtered.filter(p => p.type === journalTypeFilter);
+                      }
+                      if (journalSearch.trim()) {
+                        const q = journalSearch.toLowerCase();
+                        filtered = filtered.filter(p =>
+                          p.content.toLowerCase().includes(q) ||
+                          p.author_name.toLowerCase().includes(q)
+                        );
+                      }
+                    }
+
+                    const hiddenCount = showAllJournal ? 0 : data.journal.length - filtered.length;
+
+                    return (
+                      <>
+                        {/* Toggle + controls row */}
+                        <div className="mb-4 space-y-2">
+                          <button
+                            onClick={() => { setShowAllJournal(v => !v); setJournalSearch(''); setJournalTypeFilter('all'); }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[var(--nura-dim)] text-xs font-black uppercase tracking-widest transition-all"
+                          >
+                            <span>{showAllJournal ? 'All Entries' : 'Last 7 Days'}</span>
+                            <div className="flex items-center gap-2">
+                              {!showAllJournal && hiddenCount > 0 && (
+                                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-white/10 text-[var(--nura-dim)]">
+                                  +{hiddenCount} older
+                                </span>
+                              )}
+                              <ChevronDown size={13} className={`transition-transform duration-200 ${showAllJournal ? 'rotate-180' : ''}`} />
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                          </button>
+
+                          {showAllJournal && (
+                            <>
+                              {/* Search bar */}
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={journalSearch}
+                                  onChange={e => setJournalSearch(e.target.value)}
+                                  placeholder="Search entries or authors…"
+                                  className="w-full bg-[var(--nura-bg)]/60 border border-white/10 focus:border-[var(--nura-accent)] rounded-xl px-4 py-2.5 text-[var(--nura-text)] text-xs focus:outline-none placeholder:text-[var(--nura-text)]/25 transition-all pr-8"
+                                />
+                                {journalSearch && (
+                                  <button onClick={() => setJournalSearch('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--nura-dim)]/50 hover:text-[var(--nura-dim)] transition-all">
+                                    <X size={12} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Category filter pills */}
+                              <div className="flex gap-1.5 flex-wrap">
+                                <button
+                                  onClick={() => setJournalTypeFilter('all')}
+                                  className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                    journalTypeFilter === 'all'
+                                      ? 'bg-white/15 border-white/20 text-[var(--nura-text)]'
+                                      : 'bg-white/5 border-white/10 text-[var(--nura-dim)] hover:bg-white/10'
+                                  }`}
+                                >
+                                  All ({data.journal.length})
+                                </button>
+                                {(Object.entries(JOURNAL_TYPES) as [JournalPost['type'], typeof JOURNAL_TYPES[keyof typeof JOURNAL_TYPES]][]).map(([key, cfg]) => (
+                                  <button
+                                    key={key}
+                                    onClick={() => setJournalTypeFilter(key)}
+                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                      journalTypeFilter === key
+                                        ? `${cfg.bg} ${cfg.border} ${cfg.color}`
+                                        : 'bg-white/5 border-white/10 text-[var(--nura-dim)] hover:bg-white/10'
+                                    }`}
+                                  >
+                                    <cfg.icon size={8} />
+                                    {cfg.label} ({data.journal.filter(p => p.type === key).length})
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Timeline */}
+                        {!filtered.length ? (
+                          <div className="text-center py-8">
+                            <p className="text-[var(--nura-dim)] text-xs font-bold">
+                              {showAllJournal ? 'No entries match your search.' : 'No entries in the last 7 days.'}
+                            </p>
+                            {!showAllJournal && (
+                              <button onClick={() => setShowAllJournal(true)}
+                                className="mt-2 text-[var(--nura-accent)] text-xs font-black hover:underline">
+                                View all entries →
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <div className="absolute left-4 top-0 bottom-0 w-px bg-white/5" />
+                            <div className="space-y-4 pl-10">
+                              {filtered.map(post => {
+                                const cfg = JOURNAL_TYPES[post.type] || JOURNAL_TYPES.update;
+                                const Icon = cfg.icon;
+                                const isYou = post.author_email === userEmail;
+                                return (
+                                  <div key={post.entry_id} className="relative">
+                                    <div className={`absolute -left-[1.75rem] top-4 w-2.5 h-2.5 rounded-full border-2 border-[var(--nura-card)] ${cfg.bg}`} />
+                                    <div className="bg-[var(--nura-bg)]/40 rounded-2xl border border-white/5 p-4">
+                                      <div className="flex items-start justify-between gap-2 mb-2">
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="w-7 h-7 rounded-full bg-[var(--nura-accent)]/20 flex items-center justify-center shrink-0">
+                                            <span className="text-[10px] font-black text-[var(--nura-accent)]">{initials(post.author_name)}</span>
+                                          </div>
+                                          <div>
+                                            <p className="font-bold text-[var(--nura-text)] text-sm leading-tight">
+                                              {post.author_name}
+                                              {isYou && <span className="ml-1 text-[9px] font-black text-[var(--nura-accent)]/70">(you)</span>}
+                                            </p>
+                                            <div className="flex items-center gap-1 text-[9px] text-[var(--nura-dim)]/50">
+                                              <Clock size={8} />{fmt(post.timestamp)}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest shrink-0 ${cfg.bg} ${cfg.border} ${cfg.color}`}>
+                                          <Icon size={9} />{cfg.label}
+                                        </div>
+                                      </div>
+                                      <p className="text-[var(--nura-text)]/80 text-sm leading-relaxed">{post.content}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

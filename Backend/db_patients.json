@@ -1,9 +1,9 @@
 {
     "P-1773428369": {
         "patient_id": "P-1773428369",
-        "full_name": "Care Circle",
-        "age": 20,
-        "dementia_stage": "Early Stage (Mild)",
+        "full_name": "Cher",
+        "age": 25,
+        "dementia_stage": "Middle Stage (Moderate)",
         "patient_story": "",
         "hobbies_and_career": "",
         "avatarType": "axolotl",
@@ -14,20 +14,21 @@
             }
         ],
         "approved_topics": [
-            "2",
-            "2",
-            "2"
+            "Vicky",
+            "Viv",
+            "Mya"
         ],
         "known_triggers": [
-            "2",
-            "2",
-            "2"
+            "Charles",
+            "Onion",
+            "Garlic"
         ],
         "access_code": "6V80YL",
         "authorized_users": [
             "new@care",
             "2c@c",
-            "mmhansen@uwaterloo.ca"
+            "mmhansen@uwaterloo.ca",
+            "c@c"
         ]
     },
     "P-1773430091": {
@@ -59,6 +60,50 @@
             "2c@c",
             "new@care",
             "testing@colour"
+        ]
+    },
+    "P-1773693249": {
+        "patient_id": "P-1773693249",
+        "full_name": "Dad",
+        "age": 89,
+        "dementia_stage": "Early Stage (Mild)",
+        "patient_story": "",
+        "hobbies_and_career": "",
+        "avatarType": "jellyfish",
+        "key_people": [
+            {
+                "name": "John",
+                "relation": "Son"
+            },
+            {
+                "name": "Nick",
+                "relation": "Son"
+            },
+            {
+                "name": "Cher",
+                "relation": "Granddaughter"
+            },
+            {
+                "name": "Mike",
+                "relation": "Doctor"
+            }
+        ],
+        "approved_topics": [
+            "Gardening",
+            "Baseball",
+            "Johnny Cash",
+            "1950's Music"
+        ],
+        "known_triggers": [
+            "Money",
+            "Time",
+            "Bank"
+        ],
+        "access_code": "I0LCWP",
+        "authorized_users": [
+            "demo@gmail.com",
+            "nick@gmail.com",
+            "cher@gmail.com"
         ]
     }
 }

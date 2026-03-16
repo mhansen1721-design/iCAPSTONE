@@ -10,5 +10,37 @@
             "uploaded_by_name": "Testing2",
             "timestamp": "2026-03-13 15:22:24"
         }
+    ],
+    "P-1773693249": [
+        {
+            "photo_id": "IMG-1773695593-607",
+            "patient_id": "P-1773693249",
+            "filename": "IMG-1773695593-607.webp",
+            "url": "http://127.0.0.1:8000/uploads/IMG-1773695593-607.webp",
+            "description": "Beach day with Nick, Emma, and kids.",
+            "uploaded_by_email": "demo@gmail.com",
+            "uploaded_by_name": "John",
+            "timestamp": "2026-03-16 17:13:13"
+        },
+        {
+            "photo_id": "IMG-1773697698-419",
+            "patient_id": "P-1773693249",
+            "filename": "IMG-1773697698-419.jpeg",
+            "url": "http://127.0.0.1:8000/uploads/IMG-1773697698-419.jpeg",
+            "description": "Family photo",
+            "uploaded_by_email": "demo@gmail.com",
+            "uploaded_by_name": "John",
+            "timestamp": "2026-03-16 17:48:18"
+        },
+        {
+            "photo_id": "IMG-1773697731-653",
+            "patient_id": "P-1773693249",
+            "filename": "IMG-1773697731-653.jpg",
+            "url": "http://127.0.0.1:8000/uploads/IMG-1773697731-653.jpg",
+            "description": "Social event",
+            "uploaded_by_email": "demo@gmail.com",
+            "uploaded_by_name": "John",
+            "timestamp": "2026-03-16 17:48:51"
+        }
     ]
 }

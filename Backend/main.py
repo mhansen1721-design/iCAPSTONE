@@ -672,7 +672,23 @@ async def chat_respond(data: ChatRequest):
     should surface a prominent caregiver notification immediately.
     """
     patients_db = load_json(PATIENTS_FILE)
+    memory_db   = load_json(MEMORY_BOX_FILE)
     patient     = patients_db.get(data.patient_id, {})
+
+    # Build memory photos list — include photo_id, description, and keyword tags
+    # Keywords come from the description text itself (caregivers write descriptive captions)
+    raw_photos = memory_db.get(data.patient_id, [])
+    memory_photos = [
+        {
+            "photo_id":    p.get("photo_id", ""),
+            "url":         p.get("url", ""),
+            "description": p.get("description", ""),
+            # Use description words as keywords so the LLM can match them naturally
+            "keywords":    p.get("description", ""),
+        }
+        for p in raw_photos
+        if p.get("photo_id") and p.get("url")
+    ]
 
     # Build the patient_info dict that llm_chat.py expects
     patient_info = {
@@ -682,6 +698,7 @@ async def chat_respond(data: ChatRequest):
         "safe_topics":      patient.get("approved_topics", []),
         "triggers":         patient.get("known_triggers", []),
         "key_people":       patient.get("key_people", []),
+        "memory_photos":    memory_photos,
     }
 
     payload = {
