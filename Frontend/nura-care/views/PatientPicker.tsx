@@ -118,12 +118,12 @@ export const PatientPicker: React.FC<PatientPickerProps> = ({ patients, onSelect
                       <button
                         key={id}
                         onClick={() => { setSelectedId(id); setIsOpen(false); }}
-                        className={`w-full p-5 text-left font-black text-lg transition-all flex items-center justify-between border-b border-white/5 last:border-0 ${
-                          isMatch ? 'bg-[var(--nura-accent)] text-[#0f172a]' : 'text-white hover:bg-white/5'
+                        className={`w-full p-5 text-left font-black text-lg transition-all flex items-center justify-between border-b border-[var(--nura-accent)]/10 last:border-0 ${
+                          isMatch ? 'bg-[var(--nura-accent)] text-white' : 'text-[var(--nura-text)] hover:bg-[var(--nura-accent)]/10'
                         }`}
                       >
                         {p.name || p.full_name}
-                        {isMatch && <div className="w-2 h-2 rounded-full bg-[#0f172a]" />}
+                        {isMatch && <div className="w-2 h-2 rounded-full bg-white" />}
                       </button>
                     );
                   })}
@@ -140,8 +140,8 @@ export const PatientPicker: React.FC<PatientPickerProps> = ({ patients, onSelect
                 onClick={() => { setDuration(mins); setCustomMinutes(''); }}
                 className={`py-4 rounded-2xl font-black transition-all border-2 ${
                   duration === mins 
-                    ? 'bg-[var(--nura-accent)] border-[var(--nura-accent)] text-[#0f172a] shadow-lg shadow-[var(--nura-accent)]/20' 
-                    : 'bg-white/5 border-[var(--nura-text)]/10 text-[var(--nura-dim)] hover:border-[var(--nura-accent)]/40'
+                    ? 'bg-[var(--nura-accent)] border-[var(--nura-accent)] text-white shadow-lg shadow-[var(--nura-accent)]/20' 
+                    : 'bg-[var(--nura-card)] border-[var(--nura-text)]/10 text-[var(--nura-dim)] hover:border-[var(--nura-accent)]/40'
                 }`}
               >
                 {mins}m
@@ -151,8 +151,8 @@ export const PatientPicker: React.FC<PatientPickerProps> = ({ patients, onSelect
               onClick={() => setDuration('custom')}
               className={`py-4 rounded-2xl font-black transition-all border-2 ${
                 duration === 'custom' 
-                  ? 'bg-[var(--nura-accent)] border-[var(--nura-accent)] text-[#0f172a]' 
-                  : 'bg-white/5 border-[var(--nura-text)]/10 text-[var(--nura-dim)]'
+                  ? 'bg-[var(--nura-accent)] border-[var(--nura-accent)] text-white' 
+                  : 'bg-[var(--nura-card)] border-[var(--nura-text)]/10 text-[var(--nura-dim)]'
               }`}
             >
               Custom
@@ -167,7 +167,7 @@ export const PatientPicker: React.FC<PatientPickerProps> = ({ patients, onSelect
                 placeholder="Minutes..."
                 value={customMinutes}
                 onChange={(e) => setCustomMinutes(e.target.value)}
-                className="w-full bg-white border-2 border-[var(--nura-accent)]/30 rounded-2xl p-4 text-[#0f172a] text-center font-black text-xl focus:border-[var(--nura-accent)] outline-none placeholder:text-slate-400"
+                className="w-full bg-[var(--nura-card)] border-2 border-[var(--nura-accent)]/30 rounded-2xl p-4 text-[var(--nura-text)] text-center font-black text-xl focus:border-[var(--nura-accent)] outline-none placeholder:text-[var(--nura-dim)]"
                />
             </div>
           )}
@@ -176,7 +176,7 @@ export const PatientPicker: React.FC<PatientPickerProps> = ({ patients, onSelect
           <button 
             onClick={handleStart}
             disabled={!selectedId || (duration === 'custom' && !customMinutes)}
-            className="w-full bg-[var(--nura-accent)] hover:brightness-110 text-[#0f172a] py-6 rounded-2xl font-black text-2xl shadow-xl shadow-[var(--nura-accent)]/30 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30"
+            className="w-full bg-[var(--nura-accent)] hover:brightness-110 text-white py-6 rounded-2xl font-black text-2xl shadow-xl shadow-[var(--nura-accent)]/30 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30"
           >
             <Play size={28} fill="currentColor" /> Let's Go
           </button>

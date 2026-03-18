@@ -151,6 +151,7 @@ export default function App() {
             onEditPatient={(id) => { setEditingPatientId(id); setView('PATIENT_DETAIL'); }}
             onConfigPatient={(id) => { setEditingPatientId(id); setView('CONFIG'); }}
             onChat={(id, mins) => handleStartChat(id, mins)}
+            onBack={() => setView('ROLE_SELECTION')}
             onLogout={() => setView('LOGIN')}
             onViewLogs={() => setView('SETTINGS')}
             onJoinSuccess={() => setRefreshKey(k => k + 1)}

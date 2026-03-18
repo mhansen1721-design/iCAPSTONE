@@ -355,6 +355,45 @@
                         "timestamp": "2026-03-16T22:00:05.321Z"
                     }
                 ]
+            },
+            {
+                "timestamp": "2026-03-16 22:22:39",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": []
+            },
+            {
+                "timestamp": "2026-03-16 22:27:28",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Let's talk about gardening",
+                        "timestamp": "2026-03-17T02:26:45.831Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Gardening is so rewarding. Spring is the best time to plant most things \u2014 the soil warms up and everything wants to grow. What did you like growing most?",
+                        "timestamp": "2026-03-17T02:26:50.339Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "I like gardening Tomato's",
+                        "timestamp": "2026-03-17T02:27:11.884Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Tomatoes! That sounds great for spring planting.",
+                        "timestamp": "2026-03-17T02:27:16.859Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-17 16:40:19",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": []
             }
         ]
     }

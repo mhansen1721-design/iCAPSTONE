@@ -14,8 +14,9 @@ interface DashboardProps {
   onDeleteAccount: () => void;
   onChat: (id: string, minutes: number) => void;
   onLogout: () => void;
-  onOpenCareCenter: () => void; // Global view
-  onOpenPatientHub: (id: string) => void; // Specific patient pill view
+  onBack: () => void;
+  onOpenCareCenter: () => void;
+  onOpenPatientHub: (id: string) => void;
   onJoinSuccess: () => void;
   setAppPatients: (patients: PatientProfile[]) => void;
   onViewLogs: () => void;
@@ -23,7 +24,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  reducedMotion, caregiverEmail, refreshKey, onAddPatient, onEditPatient, onConfigPatient, onDeletePatient, onDeleteAccount, onChat, onLogout, onOpenCareCenter, onOpenPatientHub, onJoinSuccess, setAppPatients, onViewLogs,
+  reducedMotion, caregiverEmail, refreshKey, onAddPatient, onEditPatient, onConfigPatient, onDeletePatient, onDeleteAccount, onChat, onLogout, onBack, onOpenCareCenter, onOpenPatientHub, onJoinSuccess, setAppPatients, onViewLogs,
 }) => {
   const [patients, setPatients] = useState<any[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -45,6 +46,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalTab, setAddModalTab] = useState<'new' | 'join'>('new');
 
   const fetchDashboardData = async () => {
     try {
@@ -149,14 +152,83 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       <header className="mb-8 mt-4 flex items-center justify-between border-b border-white/5 pb-4">
         <div className="flex items-center gap-3">
-          <button onClick={onLogout} className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-xl transition-all bg-[var(--nura-card)] border-white/10 group"><LogOut size={20} className="text-[var(--nura-dim)] group-hover:text-red-400" /><span className="text-[var(--nura-text)] font-bold text-sm group-hover:text-red-300">Log Out</span></button>
+          <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--nura-accent)]/10 rounded-xl transition-all bg-[var(--nura-card)] border border-white/10 group"><ArrowRight size={18} className="text-[var(--nura-dim)] group-hover:text-[var(--nura-accent)] rotate-180" /><span className="text-[var(--nura-text)] font-bold text-sm">Back</span></button>
           <button onClick={onViewLogs} className="p-2.5 bg-[var(--nura-card)] hover:bg-[var(--nura-accent)]/20 rounded-full border border-white/10 transition-all text-[var(--nura-dim)] hover:text-[var(--nura-text)]"><SettingsIcon size={20} /></button>
         </div>
         <div className="flex-1 text-center"><h1 className="text-3xl font-extrabold text-[var(--nura-text)] tracking-tight">Your Loved Ones</h1></div>
-        <button onClick={() => setShowAccountDeleteModal(true)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold flex items-center gap-2"><ShieldAlert size={16} /> Delete Account</button>
+        <div className="flex items-center gap-3">
+          <button onClick={onLogout} className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-xl transition-all bg-[var(--nura-card)] border border-white/10 group"><LogOut size={20} className="text-[var(--nura-dim)] group-hover:text-red-400" /><span className="text-[var(--nura-text)] font-bold text-sm group-hover:text-red-300">Log Out</span></button>
+          <button onClick={() => setShowAccountDeleteModal(true)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold flex items-center gap-2"><ShieldAlert size={16} /> Delete Account</button>
+        </div>
       </header>
 
       {error && <div className="mb-6 bg-red-500/20 p-4 rounded-2xl text-red-100 font-bold border border-red-500/50 text-center">{error}</div>}
+
+      {/* Add Profile / Join by Code modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-[var(--nura-bg)] border border-white/10 rounded-[2.5rem] max-w-sm w-full shadow-2xl animate-in zoom-in duration-300 overflow-hidden">
+            <div className="flex items-center justify-between p-8 pb-0">
+              <h2 className="text-2xl font-black text-[var(--nura-text)]">Add a Patient</h2>
+              <button onClick={() => { setShowAddModal(false); setJoinCode(''); setJoinError(null); setAddModalTab('new'); }} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={20} className="text-[var(--nura-dim)]" /></button>
+            </div>
+
+            {/* Tab switcher */}
+            <div className="flex gap-2 mx-8 mt-6 bg-[var(--nura-card)] p-1 rounded-2xl">
+              <button onClick={() => setAddModalTab('new')} className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${addModalTab === 'new' ? 'bg-[var(--nura-accent)] text-[var(--nura-bg)] shadow' : 'text-[var(--nura-dim)] hover:text-[var(--nura-text)]'}`}>
+                <Plus size={14} className="inline mr-1.5 -mt-0.5" />New Profile
+              </button>
+              <button onClick={() => setAddModalTab('join')} className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${addModalTab === 'join' ? 'bg-[var(--nura-accent)] text-[var(--nura-bg)] shadow' : 'text-[var(--nura-dim)] hover:text-[var(--nura-text)]'}`}>
+                <KeyRound size={14} className="inline mr-1.5 -mt-0.5" />Join by Code
+              </button>
+            </div>
+
+            <div className="p-8 pt-6">
+              {addModalTab === 'new' ? (
+                <div className="flex flex-col gap-4">
+                  <p className="text-[var(--nura-dim)] text-sm leading-relaxed">Create a new patient profile and configure Nura for their needs.</p>
+                  <button onClick={() => { setShowAddModal(false); onAddPatient(); }} className="w-full py-5 rounded-2xl bg-[var(--nura-accent)] text-[var(--nura-bg)] font-black text-lg shadow-lg shadow-[var(--nura-accent)]/30 flex items-center justify-center gap-2 active:scale-95 transition-all">
+                    <Plus size={22} /> Configure New Patient
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <p className="text-[var(--nura-dim)] text-sm leading-relaxed">Enter the 6-character access code shared by the patient's primary caregiver.</p>
+                  <input
+                    type="text"
+                    placeholder="e.g. AB3X9Q"
+                    value={joinCode}
+                    onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinError(null); }}
+                    maxLength={6}
+                    className="w-full bg-[var(--nura-card)] border-2 border-[var(--nura-accent)]/30 focus:border-[var(--nura-accent)] rounded-2xl p-4 text-[var(--nura-text)] text-center text-2xl font-black tracking-[0.3em] focus:outline-none transition-all"
+                  />
+                  {joinError && <p className="text-red-400 text-sm font-bold text-center animate-pulse">{joinError}</p>}
+                  {joinSuccess && <p className="text-emerald-400 text-sm font-bold text-center">{joinSuccess}</p>}
+                  <button
+                    onClick={async () => {
+                      if (!joinCode.trim() || isJoining) return;
+                      setIsJoining(true); setJoinError(null);
+                      try {
+                        const res = await fetch('http://127.0.0.1:8000/patients/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: caregiverEmail.toLowerCase().trim(), access_code: joinCode.trim().toUpperCase() }) });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                          setJoinSuccess('Joined! Refreshing...');
+                          setTimeout(() => { setShowAddModal(false); setJoinCode(''); setJoinSuccess(null); onJoinSuccess(); fetchDashboardData(); }, 800);
+                        } else { setJoinError(data.detail || 'Invalid code.'); }
+                      } catch { setJoinError('Could not connect to server.'); } 
+                      finally { setIsJoining(false); }
+                    }}
+                    disabled={joinCode.length < 4 || isJoining}
+                    className="w-full py-5 rounded-2xl bg-[var(--nura-accent)] text-[var(--nura-bg)] font-black text-lg shadow-lg shadow-[var(--nura-accent)]/30 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-30"
+                  >
+                    <KeyRound size={20} /> {isJoining ? 'Joining...' : 'Join Care Circle'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
 
@@ -227,9 +299,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
           );
         })}
 
-        <button onClick={onAddPatient} className="bg-[var(--nura-card)]/80 rounded-[2.5rem] p-8 flex flex-col items-center justify-center gap-6 border-dashed border-2 border-white/10 w-full hover:bg-[var(--nura-accent)]/10 transition-all group min-h-[340px]">
+        <button onClick={() => { setShowAddModal(true); setAddModalTab('new'); setJoinError(null); setJoinCode(''); }} className="bg-[var(--nura-card)]/80 rounded-[2.5rem] p-8 flex flex-col items-center justify-center gap-4 border-dashed border-2 border-white/10 w-full hover:bg-[var(--nura-accent)]/10 hover:border-[var(--nura-accent)]/30 transition-all group min-h-[340px]">
           <div className="w-16 h-16 rounded-full bg-[var(--nura-accent)]/10 flex items-center justify-center group-hover:scale-110 transition-transform"><Plus size={40} className="text-[var(--nura-accent)]" /></div>
           <span className="font-black text-[var(--nura-text)] opacity-90 text-sm tracking-wide uppercase">Add New Profile</span>
+          <div className="flex items-center gap-4 w-full px-4">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-[var(--nura-dim)] text-xs font-bold">or</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
+          <div className="flex items-center gap-2 text-[var(--nura-dim)] group-hover:text-[var(--nura-accent)] transition-colors">
+            <KeyRound size={15} />
+            <span className="text-xs font-black uppercase tracking-widest">Join with Code</span>
+          </div>
         </button>
 
       </div>

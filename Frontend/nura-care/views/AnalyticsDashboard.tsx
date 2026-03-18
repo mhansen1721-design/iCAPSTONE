@@ -465,6 +465,151 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   // Chart data — only days with data get a dot, rest show neutral line
   const chartData = w.emotionByDay;
 
+  // ── Print / Export ──────────────────────────────────────────────────────────
+  const handleExportReport = (
+    week: WeekData,
+    weekInsights: string[] | undefined,
+    name: string,
+    engChange: number | null
+  ) => {
+    const avgEmotion = week.emotionByDay.filter(d => d.hasData);
+    const avgScore = avgEmotion.length > 0
+      ? Math.round(avgEmotion.reduce((s, d) => s + d.score, 0) / avgEmotion.length)
+      : 0;
+    const { emotion: avgEmotionLabel } = scoreToEmotion(avgScore);
+
+    const alertColor   = week.alertEvents.length > 0 ? '#ef4444' : '#10b981';
+    const alertLabel   = week.alertEvents.length > 0
+      ? `⚠️ ${week.alertEvents.length} Emergency Alert${week.alertEvents.length !== 1 ? 's' : ''} Detected`
+      : '✅ No Critical Alerts';
+    const engColor     = (engChange ?? 0) >= 0 ? '#10b981' : '#ef4444';
+    const engChangeStr = engChange !== null ? `${engChange >= 0 ? '+' : ''}${engChange}% vs last week` : '';
+
+    const insightItems = (weekInsights && weekInsights.length > 0)
+      ? weekInsights.map(i => `<li style="margin-bottom:10px;line-height:1.6;">${i}</li>`).join('')
+      : '<li style="color:#6b7280;">No insights available for this period.</li>';
+
+    const emotionRows = week.emotionByDay
+      .map(d => `
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:8px 12px;font-weight:600;color:#374151;">${d.day}</td>
+          <td style="padding:8px 12px;text-align:center;">${d.hasData ? d.emoji : '—'}</td>
+          <td style="padding:8px 12px;color:#6b7280;">${d.hasData ? d.emotion : 'No session'}</td>
+          <td style="padding:8px 12px;text-align:right;font-weight:700;color:#4f46e5;">${d.hasData ? d.score + '%' : '—'}</td>
+        </tr>`).join('');
+
+    const topKeywords = week.keywords.slice(0, 8).map(k =>
+      `<span style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;margin:3px;">${k.text} ×${k.count}</span>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Weekly Care Report — ${name}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #1f2937; padding: 48px; max-width: 860px; margin: auto; }
+    @media print { body { padding: 24px; } .no-print { display: none !important; } }
+    h1 { font-size: 28px; font-weight: 900; color: #1f2937; margin-bottom: 4px; }
+    h2 { font-size: 15px; font-weight: 600; color: #6b7280; margin-bottom: 32px; }
+    .section { margin-bottom: 28px; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; }
+    .section-header { background: #f9fafb; padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #374151; }
+    .section-body { padding: 20px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+    .stat-box { background: #f9fafb; border-radius: 12px; padding: 16px 20px; text-align: center; border: 1px solid #e5e7eb; }
+    .stat-value { font-size: 32px; font-weight: 900; color: #4f46e5; line-height: 1; }
+    .stat-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 12px; color: #9ca3af; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 2px solid #e5e7eb; }
+    .alert-badge { display:inline-block; padding:6px 16px; border-radius:999px; font-weight:800; font-size:13px; color:${alertColor}; background:${alertColor}18; border:1px solid ${alertColor}40; }
+    .insight-list { list-style:none; padding-left: 0; }
+    .insight-list li::before { content:"→ "; color:#4f46e5; font-weight:900; }
+    .footer { text-align:center; color:#d1d5db; font-size:11px; margin-top:32px; padding-top:20px; border-top:1px solid #f3f4f6; }
+    .print-btn { display:inline-flex;align-items:center;gap:8px;background:#4f46e5;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:28px; }
+    .print-btn:hover { background:#4338ca; }
+  </style>
+</head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <h1>Weekly Care Report</h1>
+  <h2>${name} &nbsp;·&nbsp; ${week.range}</h2>
+
+  <!-- Stats row -->
+  <div class="stat-grid" style="margin-bottom:28px;">
+    <div class="stat-box">
+      <div class="stat-value">${week.sessionCount}</div>
+      <div class="stat-label">Sessions</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">${week.totalPatientMessages}</div>
+      <div class="stat-label">Patient Messages</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value" style="color:${engColor}">${week.engagementLevel}%</div>
+      <div class="stat-label">Engagement${engChangeStr ? ` (${engChangeStr})` : ''}</div>
+    </div>
+  </div>
+
+  <!-- Alert status -->
+  <div class="section">
+    <div class="section-header">Alert Status</div>
+    <div class="section-body">
+      <span class="alert-badge">${alertLabel}</span>
+      ${week.alertEvents.length > 0 ? `<ul style="margin-top:12px;font-size:13px;color:#374151;">${
+        week.alertEvents.map(e => `<li style="margin-bottom:6px;">• Keyword "<strong>${e.trigger}</strong>" on ${new Date(e.timestamp).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</li>`).join('')
+      }</ul>` : `<p style="margin-top:10px;font-size:13px;color:#6b7280;">All ${week.sessionCount} session${week.sessionCount !== 1 ? 's' : ''} monitored. No emergencies detected.</p>`}
+    </div>
+  </div>
+
+  <!-- Emotion by day -->
+  <div class="section">
+    <div class="section-header">Emotional & Cognitive Trend</div>
+    <div class="section-body" style="padding:0;">
+      <table>
+        <thead><tr><th>Day</th><th style="text-align:center;">Mood</th><th>Emotion</th><th style="text-align:right;">Score</th></tr></thead>
+        <tbody>${emotionRows}</tbody>
+      </table>
+    </div>
+    <div style="padding:12px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+      Weekly average: <strong style="color:#4f46e5;">${avgEmotionLabel} (${avgScore}%)</strong>
+    </div>
+  </div>
+
+  <!-- Responsiveness -->
+  <div class="section">
+    <div class="section-header">Responsiveness</div>
+    <div class="section-body">
+      <table style="font-size:13px;">
+        <tr><td style="padding:6px 0;color:#6b7280;width:180px;">Most Active Time</td><td style="font-weight:700;">${week.bestHour}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Least Active Time</td><td style="font-weight:700;">${week.worstHour}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Confusion Events</td><td style="font-weight:700;">${week.confusionCount}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Distress Events</td><td style="font-weight:700;">${week.distressCount}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  ${topKeywords ? `<div class="section">
+    <div class="section-header">Common Topics</div>
+    <div class="section-body">${topKeywords}</div>
+  </div>` : ''}
+
+  <!-- AI Insights -->
+  <div class="section">
+    <div class="section-header">✦ AI Caregiver Insights</div>
+    <div class="section-body">
+      <ul class="insight-list">${insightItems}</ul>
+    </div>
+  </div>
+
+  <div class="footer">Generated by Nura &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (win) { win.document.write(html); win.document.close(); }
+  };
+
   return (
     <div className="space-y-8 pb-20 pt-6">
 
@@ -742,7 +887,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
         <div className="absolute top-0 right-0 p-8">
           <button
-            onClick={() => window.print()}
+            onClick={() => handleExportReport(w, insights, patientName, engagementChange)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl text-sm font-bold transition-all shadow-lg"
           >
             <Download size={16} /> Export
@@ -839,4 +984,3 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     </div>
   );
 };
-
