@@ -13,6 +13,7 @@ interface ConfigFlowProps {
   patient: PatientProfile | null;
   onSave: (patient: PatientProfile) => void;
   onBack: () => void;
+  isEmbedded?: boolean; // <-- Added to control embedded styling
 }
 
 const EmptyPatient: PatientProfile = {
@@ -32,9 +33,9 @@ const EmptyPatient: PatientProfile = {
 
 const AVATAR_OPTIONS: AvatarType[] = ['panda', 'jellyfish', 'axolotl'];
 
-export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient, onSave, onBack }) => {
+export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient, onSave, onBack, isEmbedded = false }) => {
   const [formData, setFormData] = useState<PatientProfile>(patient || { ...EmptyPatient });
-  const [currentStep, setCurrentStep] = useState<number>(0); // 0: Basics, 1: People & Safety
+  const [currentStep, setCurrentStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -97,7 +98,7 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
       dementia_stage: formData.stage,
       patient_story: formData.description || "",
       hobbies_and_career: (formData.lifestyles || []).join(", "),
-      key_people: (formData.familyMembers || []).map(m => ({ name: m.name, relation: m.relation })),
+      key_people: (formData.familyMembers || []).map((m: any) => ({ name: m.name, relation: m.relation })),
       approved_topics: formData.safeTopics || [],
       known_triggers: formData.triggers || []
     };
@@ -144,7 +145,8 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col p-6 pb-48 text-[var(--nura-text)]">
+    // Changed min-h-screen to conditional so it doesn't double-scroll when embedded
+    <div className={`w-full max-w-5xl mx-auto flex flex-col p-6 pb-48 text-[var(--nura-text)] ${isEmbedded ? 'min-h-full' : 'min-h-screen'}`}>
       <div className="max-w-3xl mx-auto w-full space-y-8">
 
         {/* ── PAGE HEADER ── */}
@@ -342,8 +344,8 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
       </div>
 
       {/* FOOTER */}
-      <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[var(--nura-bg)] via-[var(--nura-bg)] to-transparent z-50">
-        <div className="max-w-3xl mx-auto flex flex-col gap-4">
+      <div className={`fixed bottom-0 left-0 right-0 p-8 z-50 pointer-events-none`}>
+        <div className="max-w-3xl mx-auto flex flex-col gap-4 pointer-events-auto">
           {error && (
             <div className="bg-red-500/20 border border-red-500/50 text-red-100 p-4 rounded-2xl flex items-center gap-3 animate-bounce">
               <AlertTriangle size={20} className="text-red-500" />
@@ -351,8 +353,13 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
             </div>
           )}
           <div className="flex gap-4">
-            <button onClick={onBack} className="px-8 py-5 rounded-2xl bg-[var(--nura-card)] text-[var(--nura-text)] font-bold border border-[var(--nura-text)]/10">Cancel</button>
-            {currentStep === 1 && <button onClick={() => setCurrentStep(0)} className="px-8 py-5 rounded-2xl bg-[var(--nura-card)] text-[var(--nura-text)] font-bold border border-[var(--nura-text)]/10"><ArrowLeft size={24}/></button>}
+            {/* Condition: Hides the Cancel button entirely if embedded in PatientHub */}
+            {!isEmbedded && (
+              <button onClick={onBack} className="px-8 py-5 rounded-2xl bg-[var(--nura-card)] text-[var(--nura-text)] font-bold border border-[var(--nura-text)]/10 shadow-lg hover:brightness-110">Cancel</button>
+            )}
+            {/* We still keep the 'Back' arrow to return to step 0 if they are on step 1 */}
+            {currentStep === 1 && <button onClick={() => setCurrentStep(0)} className="px-8 py-5 rounded-2xl bg-[var(--nura-card)] text-[var(--nura-text)] font-bold border border-[var(--nura-text)]/10 shadow-lg hover:brightness-110"><ArrowLeft size={24}/></button>}
+            
             <button 
               onClick={currentStep === 0 ? handleNext : handleFinalSave} 
               disabled={isLoading}
