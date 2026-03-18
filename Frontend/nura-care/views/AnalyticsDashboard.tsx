@@ -4,12 +4,14 @@ import {
   AlertCircle, TrendingUp, MessageSquare,
   Clock, Activity, Download,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Sparkles, Loader2, TriangleAlert, ShieldCheck
+  Sparkles, Loader2, TriangleAlert, ShieldCheck,
+  Printer, Calendar, Heart, Brain
 } from 'lucide-react';
 import {
   XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
+import { GoogleGenAI, Type } from '@google/genai';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface AnalyticsDashboardProps {
@@ -53,6 +55,12 @@ interface WeekData {
   alertEvents: AlertEvent[];
   bestHour: string;
   worstHour: string;
+}
+
+interface WeeklyInsights {
+  generalSummary: string;
+  notableConversations: string[];
+  caregiverRecommendations: string[];
 }
 
 // ─── Detection keyword sets (mirror llm_chat.py) ─────────────────────────────
@@ -249,7 +257,7 @@ function computeWeekData(
   // Best / worst hour
   const hourEntries = Object.entries(hourMsgCount).map(([h, c]) => ({ h: Number(h), c }));
   hourEntries.sort((a, b) => b.c - a.c);
-  const bestHour  = hourEntries.length > 0 ? formatHour(hourEntries[0].h)  : 'Not enough data';
+  const bestHour  = hourEntries.length > 0 ? formatHour(hourEntries[0]?.h)  : 'Not enough data';
   const worstHour = hourEntries.length > 1 ? formatHour(hourEntries[hourEntries.length - 1].h) : 'Not enough data';
 
   return {
@@ -290,11 +298,18 @@ Session Data Summary:
 - Most responsive time: ${w.bestHour}
 - Least responsive time: ${w.worstHour}
 
-Write exactly 3 specific, actionable caregiver insights based ONLY on this data.
-Focus on what actually happened — what worked, what to watch for, and concrete recommendations.
+Write a concise weekly care summary based ONLY on this data.
+Include:
+1. A general summary of the patient's week (combining mood, behavior, and overall conversation flow).
+2. Notable conversations or topics.
+3. Caregiver recommendations (actionable advice for the caregiver based on the week's data).
 
-Respond ONLY with valid JSON (no markdown, no extra text):
-{"insights":["Insight one.","Insight two.","Insight three."]}`;
+Respond ONLY with valid JSON (no markdown, no extra text) matching this schema:
+{
+  "generalSummary": "string",
+  "notableConversations": ["string", "string"],
+  "caregiverRecommendations": ["string", "string"]
+}`;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -324,7 +339,7 @@ const PaginationControls = ({
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
-  const d = payload[0].payload as DayEmotion;
+  const d = payload?.[0]?.payload as DayEmotion;
   return (
     <div className="bg-[var(--nura-bg)] border border-white/20 p-4 rounded-2xl shadow-2xl backdrop-blur-md">
       <p className="text-[var(--nura-dim)] text-[10px] font-black uppercase tracking-widest mb-2">{label}</p>
@@ -352,7 +367,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const [weekIndex, setWeekIndex]           = useState(0);
   const [hoveredWord, setHoveredWord]       = useState<string | null>(null);
   const [showDailyTime, setShowDailyTime]   = useState(false);
-  const [llmInsights, setLlmInsights]       = useState<Record<string, string[]>>({});
+  const [llmInsights, setLlmInsights]       = useState<Record<string, WeeklyInsights>>({});
   const [isGenerating, setIsGenerating]     = useState(false);
 
   // ── Group logs into weeks, compute analytics ────────────────────────────────
@@ -401,39 +416,57 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const generate = async () => {
       setIsGenerating(true);
       try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1000,
-            messages: [{ role: 'user', content: buildInsightsPrompt(patientName, currentWeek) }],
-          }),
+        const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: buildInsightsPrompt(patientName, currentWeek),
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                generalSummary: { type: Type.STRING },
+                notableConversations: { type: Type.ARRAY, items: { type: Type.STRING } },
+                caregiverRecommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+              },
+              required: ["generalSummary", "notableConversations", "caregiverRecommendations"]
+            }
+          }
         });
-        const data = await res.json();
-        const text = (data.content || []).map((b: any) => b.text || '').join('');
-        const clean = text.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(clean);
-        setLlmInsights(prev => ({ ...prev, [key]: parsed.insights || [] }));
-      } catch {
+        
+        const text = response.text || "{}";
+        const parsed = JSON.parse(text) as WeeklyInsights;
+        setLlmInsights(prev => ({ ...prev, [key]: parsed }));
+      } catch (err) {
+        console.error("Failed to generate insights", err);
         // Fallback to rule-based insights
         const w = currentWeek;
-        const fallback: string[] = [];
-        if (w.sessionCount > 0) {
-          fallback.push(`${w.sessionCount} session${w.sessionCount !== 1 ? 's' : ''} completed this week with ${w.totalPatientMessages} patient messages recorded.`);
-        }
+        const fallback: WeeklyInsights = {
+          generalSummary: w.sessionCount > 0 
+            ? `${w.sessionCount} session(s) completed this week. Average emotion score was ${Math.round(w.emotionByDay.filter(d => d.hasData).reduce((s,d) => s+d.score, 0) / (w.emotionByDay.filter(d => d.hasData).length || 1))}/100.`
+            : "No sessions recorded this week.",
+          notableConversations: [],
+          caregiverRecommendations: []
+        };
+        
         if (w.confusionCount > 0) {
-          fallback.push(`${w.confusionCount} confusion event${w.confusionCount !== 1 ? 's' : ''} detected. Consider simplifying conversation topics and using more grounding statements.`);
-        } else {
-          fallback.push('No confusion events detected this week — patient appeared oriented during sessions.');
+          fallback.generalSummary += ` ${w.confusionCount} confusion event(s) detected.`;
+          fallback.caregiverRecommendations.push("Consider simplifying conversation topics and using more grounding statements.");
         }
+        
         if (w.alertEvents.length > 0) {
-          fallback.push(`⚠️ ${w.alertEvents.length} emergency alert${w.alertEvents.length !== 1 ? 's' : ''} triggered. Review session transcripts and discuss with the care team.`);
-        } else if (w.keywords.length > 0) {
-          fallback.push(`Most discussed topics this week: ${w.keywords.slice(0,3).map(k=>k.text).join(', ')}. Consider incorporating these into future sessions.`);
-        } else {
-          fallback.push('No specific topics stood out this week. Encourage conversations around known interests.');
+          fallback.generalSummary += ` ⚠️ ${w.alertEvents.length} emergency alert(s) triggered.`;
+          fallback.caregiverRecommendations.push("Review session transcripts and discuss with the care team.");
         }
+        
+        if (w.keywords.length > 0) {
+          fallback.notableConversations.push(`Most discussed topics: ${w.keywords.slice(0,3).map(k=>k.text).join(', ')}.`);
+        }
+        
+        if (fallback.caregiverRecommendations.length === 0) {
+          fallback.caregiverRecommendations.push("Continue current care plan. Patient appears stable.");
+        }
+        
         setLlmInsights(prev => ({ ...prev, [key]: fallback }));
       } finally {
         setIsGenerating(false);
@@ -458,6 +491,12 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const w = currentWeek!;
   const insights = currentWeek ? llmInsights[currentWeek.weekKey] : undefined;
   const prevWeek = allWeekData[weekIndex + 1];
+  
+  const avgScore = w.emotionByDay.filter(d => d.hasData).reduce((s,d) => s+d.score, 0) / (w.emotionByDay.filter(d => d.hasData).length || 1);
+  const prevAvgScore = prevWeek ? prevWeek.emotionByDay.filter(d => d.hasData).reduce((s,d) => s+d.score, 0) / (prevWeek.emotionByDay.filter(d => d.hasData).length || 1) : null;
+  const emotionChange = prevAvgScore !== null ? Math.round(avgScore) - Math.round(prevAvgScore) : null;
+  const confusionChange = prevWeek ? w.confusionCount - prevWeek.confusionCount : null;
+
   const engagementChange = prevWeek
     ? w.engagementLevel - prevWeek.engagementLevel
     : null;
@@ -465,206 +504,124 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   // Chart data — only days with data get a dot, rest show neutral line
   const chartData = w.emotionByDay;
 
-  // ── Print / Export ──────────────────────────────────────────────────────────
-  const handleExportReport = (
-    week: WeekData,
-    weekInsights: string[] | undefined,
-    name: string,
-    engChange: number | null
-  ) => {
-    const avgEmotion = week.emotionByDay.filter(d => d.hasData);
-    const avgScore = avgEmotion.length > 0
-      ? Math.round(avgEmotion.reduce((s, d) => s + d.score, 0) / avgEmotion.length)
-      : 0;
-    const { emotion: avgEmotionLabel } = scoreToEmotion(avgScore);
-
-    const alertColor   = week.alertEvents.length > 0 ? '#ef4444' : '#10b981';
-    const alertLabel   = week.alertEvents.length > 0
-      ? `⚠️ ${week.alertEvents.length} Emergency Alert${week.alertEvents.length !== 1 ? 's' : ''} Detected`
-      : '✅ No Critical Alerts';
-    const engColor     = (engChange ?? 0) >= 0 ? '#10b981' : '#ef4444';
-    const engChangeStr = engChange !== null ? `${engChange >= 0 ? '+' : ''}${engChange}% vs last week` : '';
-
-    const insightItems = (weekInsights && weekInsights.length > 0)
-      ? weekInsights.map(i => `<li style="margin-bottom:10px;line-height:1.6;">${i}</li>`).join('')
-      : '<li style="color:#6b7280;">No insights available for this period.</li>';
-
-    const emotionRows = week.emotionByDay
-      .map(d => `
-        <tr style="border-bottom:1px solid #e5e7eb;">
-          <td style="padding:8px 12px;font-weight:600;color:#374151;">${d.day}</td>
-          <td style="padding:8px 12px;text-align:center;">${d.hasData ? d.emoji : '—'}</td>
-          <td style="padding:8px 12px;color:#6b7280;">${d.hasData ? d.emotion : 'No session'}</td>
-          <td style="padding:8px 12px;text-align:right;font-weight:700;color:#4f46e5;">${d.hasData ? d.score + '%' : '—'}</td>
-        </tr>`).join('');
-
-    const topKeywords = week.keywords.slice(0, 8).map(k =>
-      `<span style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;margin:3px;">${k.text} ×${k.count}</span>`
-    ).join('');
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Weekly Care Report — ${name}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #1f2937; padding: 48px; max-width: 860px; margin: auto; }
-    @media print { body { padding: 24px; } .no-print { display: none !important; } }
-    h1 { font-size: 28px; font-weight: 900; color: #1f2937; margin-bottom: 4px; }
-    h2 { font-size: 15px; font-weight: 600; color: #6b7280; margin-bottom: 32px; }
-    .section { margin-bottom: 28px; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; }
-    .section-header { background: #f9fafb; padding: 14px 20px; border-bottom: 1px solid #e5e7eb; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #374151; }
-    .section-body { padding: 20px; }
-    .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
-    .stat-box { background: #f9fafb; border-radius: 12px; padding: 16px 20px; text-align: center; border: 1px solid #e5e7eb; }
-    .stat-value { font-size: 32px; font-weight: 900; color: #4f46e5; line-height: 1; }
-    .stat-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 6px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { text-align: left; padding: 8px 12px; color: #9ca3af; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 2px solid #e5e7eb; }
-    .alert-badge { display:inline-block; padding:6px 16px; border-radius:999px; font-weight:800; font-size:13px; color:${alertColor}; background:${alertColor}18; border:1px solid ${alertColor}40; }
-    .insight-list { list-style:none; padding-left: 0; }
-    .insight-list li::before { content:"→ "; color:#4f46e5; font-weight:900; }
-    .footer { text-align:center; color:#d1d5db; font-size:11px; margin-top:32px; padding-top:20px; border-top:1px solid #f3f4f6; }
-    .print-btn { display:inline-flex;align-items:center;gap:8px;background:#4f46e5;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:28px; }
-    .print-btn:hover { background:#4338ca; }
-  </style>
-</head>
-<body>
-  <button class="print-btn no-print" onclick="window.print()">🖨 Print / Save as PDF</button>
-  <h1>Weekly Care Report</h1>
-  <h2>${name} &nbsp;·&nbsp; ${week.range}</h2>
-
-  <!-- Stats row -->
-  <div class="stat-grid" style="margin-bottom:28px;">
-    <div class="stat-box">
-      <div class="stat-value">${week.sessionCount}</div>
-      <div class="stat-label">Sessions</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-value">${week.totalPatientMessages}</div>
-      <div class="stat-label">Patient Messages</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-value" style="color:${engColor}">${week.engagementLevel}%</div>
-      <div class="stat-label">Engagement${engChangeStr ? ` (${engChangeStr})` : ''}</div>
-    </div>
-  </div>
-
-  <!-- Alert status -->
-  <div class="section">
-    <div class="section-header">Alert Status</div>
-    <div class="section-body">
-      <span class="alert-badge">${alertLabel}</span>
-      ${week.alertEvents.length > 0 ? `<ul style="margin-top:12px;font-size:13px;color:#374151;">${
-        week.alertEvents.map(e => `<li style="margin-bottom:6px;">• Keyword "<strong>${e.trigger}</strong>" on ${new Date(e.timestamp).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</li>`).join('')
-      }</ul>` : `<p style="margin-top:10px;font-size:13px;color:#6b7280;">All ${week.sessionCount} session${week.sessionCount !== 1 ? 's' : ''} monitored. No emergencies detected.</p>`}
-    </div>
-  </div>
-
-  <!-- Emotion by day -->
-  <div class="section">
-    <div class="section-header">Emotional & Cognitive Trend</div>
-    <div class="section-body" style="padding:0;">
-      <table>
-        <thead><tr><th>Day</th><th style="text-align:center;">Mood</th><th>Emotion</th><th style="text-align:right;">Score</th></tr></thead>
-        <tbody>${emotionRows}</tbody>
-      </table>
-    </div>
-    <div style="padding:12px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
-      Weekly average: <strong style="color:#4f46e5;">${avgEmotionLabel} (${avgScore}%)</strong>
-    </div>
-  </div>
-
-  <!-- Responsiveness -->
-  <div class="section">
-    <div class="section-header">Responsiveness</div>
-    <div class="section-body">
-      <table style="font-size:13px;">
-        <tr><td style="padding:6px 0;color:#6b7280;width:180px;">Most Active Time</td><td style="font-weight:700;">${week.bestHour}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Least Active Time</td><td style="font-weight:700;">${week.worstHour}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Confusion Events</td><td style="font-weight:700;">${week.confusionCount}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Distress Events</td><td style="font-weight:700;">${week.distressCount}</td></tr>
-      </table>
-    </div>
-  </div>
-
-  ${topKeywords ? `<div class="section">
-    <div class="section-header">Common Topics</div>
-    <div class="section-body">${topKeywords}</div>
-  </div>` : ''}
-
-  <!-- AI Insights -->
-  <div class="section">
-    <div class="section-header">✦ AI Caregiver Insights</div>
-    <div class="section-body">
-      <ul class="insight-list">${insightItems}</ul>
-    </div>
-  </div>
-
-  <div class="footer">Generated by Nura &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
-</body>
-</html>`;
-
-    const win = window.open('', '_blank', 'width=900,height=700');
-    if (win) { win.document.write(html); win.document.close(); }
-  };
-
   return (
     <div className="space-y-8 pb-20 pt-6">
 
-      {/* ── A. Urgent Notifications ─────────────────────────────────────────── */}
-      <section className={`p-6 rounded-3xl border ${
-        w.alertEvents.length > 0
-          ? 'bg-red-500/10 border-red-500/30'
-          : 'bg-emerald-500/10 border-emerald-500/20'
-      }`}>
-        <h3 className={`flex items-center gap-3 text-xl font-black mb-4 ${
-          w.alertEvents.length > 0 ? 'text-red-400' : 'text-emerald-400'
+      {/* ── Top Row: Alerts & AI Insights ─────────────────────────────────── */}
+      <div className="flex flex-col gap-6">
+        {/* Alerts */}
+        <section className={`p-6 rounded-3xl border flex flex-col ${
+          w.alertEvents.length > 0
+            ? 'bg-[var(--nura-card)] border-red-500/30'
+            : 'bg-[var(--nura-card)] border-emerald-500/30'
         }`}>
-          {w.alertEvents.length > 0
-            ? <><TriangleAlert /> Emergency Alerts — {w.alertEvents.length} Detected</>
-            : <><ShieldCheck /> No Critical Alerts This Week</>
-          }
-        </h3>
-        {w.alertEvents.length > 0 ? (
-          <div className="space-y-3">
-            {w.alertEvents.map((evt, i) => (
-              <div key={i} className="bg-white/5 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3">
-                <AlertCircle size={18} className="text-red-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-black text-[var(--nura-text)] text-sm">
-                    Emergency keyword detected: <span className="text-red-300">"{evt.trigger}"</span>
-                  </p>
-                  <p className="text-xs text-[var(--nura-dim)] mt-0.5">
-                    Session on {parseDate(evt.timestamp).toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' })}
-                    {' '}at {parseDate(evt.timestamp).toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' })}
-                  </p>
-                  <button
-                    onClick={() => onNavigateToLogs('alert')}
-                    className="mt-2 text-[10px] font-black text-red-400 uppercase tracking-widest hover:underline"
-                  >
-                    View Session Log →
-                  </button>
+          <h3 className={`flex items-center gap-3 text-xl font-black mb-2 ${
+            w.alertEvents.length > 0 ? 'text-red-400' : 'text-emerald-400'
+          }`}>
+            {w.alertEvents.length > 0
+              ? <><TriangleAlert /> Emergency Alerts — {w.alertEvents.length} Detected</>
+              : <><ShieldCheck /> No Critical Alerts This Week</>
+            }
+          </h3>
+          {w.alertEvents.length > 0 ? (
+            <div className="space-y-4 flex-1 overflow-y-auto">
+              {w.alertEvents.map((evt, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <AlertCircle size={18} className="text-red-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-black text-[var(--nura-text)] text-sm">
+                      Emergency keyword detected: <span className="text-red-300">"{evt.trigger}"</span>
+                    </p>
+                    <p className="text-xs text-[var(--nura-dim)] mt-0.5">
+                      Session on {parseDate(evt.timestamp).toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' })}
+                      {' '}at {parseDate(evt.timestamp).toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' })}
+                    </p>
+                    <button
+                      onClick={() => onNavigateToLogs('alert')}
+                      className="mt-2 text-[10px] font-black text-red-400 uppercase tracking-widest hover:underline"
+                    >
+                      View Session Log →
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white/5 border border-emerald-500/20 p-4 rounded-2xl flex items-start gap-3">
-            <ShieldCheck size={18} className="text-emerald-400 mt-0.5 shrink-0" />
+              ))}
+            </div>
+          ) : (
             <div>
               <p className="font-black text-[var(--nura-text)] text-sm">System monitored all {w.sessionCount} session{w.sessionCount !== 1 ? 's' : ''} for distress, self-harm, and medical emergencies.</p>
               <p className="text-xs text-[var(--nura-dim)] mt-0.5">Everything appears stable this week.</p>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
 
-      {/* ── B + C. Emotion chart + Engagement ──────────────────────────────── */}
+        {/* AI Insights */}
+        <section className="bg-[var(--nura-card)] p-6 rounded-3xl border border-white/5 flex flex-col">
+          <h4 className="flex items-center gap-2 text-sm font-bold text-[var(--nura-dim)] uppercase tracking-widest mb-4">
+            <Sparkles size={14} className="text-indigo-400" />
+            AI Caregiver Insights
+          </h4>
+          {isGenerating ? (
+            <div className="flex items-center justify-center flex-1 gap-3 py-6 text-[var(--nura-dim)]">
+              <Loader2 size={18} className="animate-spin text-indigo-400" />
+              <span className="text-sm font-medium">Analysing session data…</span>
+            </div>
+          ) : insights ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col">
+                <h5 className="text-xs font-bold text-indigo-200 mb-2">General Summary</h5>
+                <p className="text-sm text-indigo-100/80 leading-relaxed flex-1">{insights.generalSummary}</p>
+              </div>
+              
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col">
+                <h5 className="text-xs font-bold text-indigo-200 mb-3">Notable Conversations</h5>
+                {insights.notableConversations && insights.notableConversations.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 content-start">
+                    {insights.notableConversations.map((conv, i) => (
+                      <span key={i} className="bg-indigo-500/20 text-indigo-200 text-xs px-3 py-1.5 rounded-xl border border-indigo-500/20">
+                        {conv}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-indigo-100/50 italic">No notable conversations recorded.</p>
+                )}
+              </div>
+
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col">
+                <h5 className="text-xs font-bold text-indigo-200 mb-3">Caregiver Recommendations</h5>
+                {insights.caregiverRecommendations && insights.caregiverRecommendations.length > 0 ? (
+                  <ul className="space-y-2">
+                    {insights.caregiverRecommendations.map((rec, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-indigo-100/80">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-indigo-100/50 italic">No specific recommendations this week.</p>
+                )}
+              </div>
+            </div>
+          ) : w.sessionCount === 0 ? (
+            <div className="flex items-center justify-center flex-1">
+              <p className="text-[var(--nura-dim)] text-sm font-bold py-4">
+                No sessions to analyse for this week.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center flex-1 gap-3 py-4 text-[var(--nura-dim)]">
+              <Loader2 size={18} className="animate-spin text-indigo-400" />
+              <span className="text-sm">Loading insights…</span>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ── C + D. Emotion chart + Engagement ──────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-        {/* B. Emotion & Cognitive Trend */}
+        {/* C. Emotion & Cognitive Trend */}
         <section className="bg-[var(--nura-card)] p-8 rounded-3xl border border-white/5">
           <div className="flex items-center justify-between mb-6">
             <h3 className="flex items-center gap-3 text-xl font-bold text-indigo-100">
@@ -736,7 +693,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
         </section>
 
-        {/* C. Engagement Progress */}
+        {/* D. Engagement Progress */}
         <div className="space-y-8">
           <section className="bg-[var(--nura-card)] p-8 rounded-3xl border border-white/5">
             <div className="flex items-center justify-between mb-4">
@@ -826,7 +783,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
           </section>
 
-          {/* D. Common Keywords */}
+          {/* E. Common Keywords */}
           <section className="bg-[var(--nura-card)] p-8 rounded-3xl border border-white/5">
             <div className="flex items-center justify-between mb-6">
               <h3 className="flex items-center gap-3 text-xl font-bold text-indigo-100">
@@ -877,7 +834,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* ── E. Weekly Summary (AI-powered) ──────────────────────────────────── */}
+      {/* ── B. Weekly Summary (Stats) ──────────────────────────────────── */}
       <section className="bg-[var(--nura-card)] p-10 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
         <div className="absolute top-0 left-0 p-8">
           <PaginationControls
@@ -887,95 +844,98 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
         <div className="absolute top-0 right-0 p-8">
           <button
-            onClick={() => handleExportReport(w, insights, patientName, engagementChange)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl text-sm font-bold transition-all shadow-lg"
+            onClick={() => window.print()}
+            className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-[var(--nura-dim)] transition-colors"
+            title="Print Report"
           >
-            <Download size={16} /> Export
+            <Printer size={20} />
           </button>
         </div>
 
-        <div className="max-w-2xl mx-auto pt-8">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-black text-[var(--nura-text)] mb-2">Weekly Care Summary</h2>
-            <p className="text-[var(--nura-dim)] font-medium">{w.range}</p>
-            {w.sessionCount === 0 && (
-              <p className="text-amber-400 text-sm font-bold mt-2">No sessions recorded this week</p>
-            )}
+        <div className="flex flex-col items-center text-center mb-12 mt-4">
+          <h2 className="text-3xl font-black text-[var(--nura-text)] mb-2">Weekly Care Summary</h2>
+          <p className="text-[var(--nura-dim)] font-medium flex items-center gap-2">
+            <Calendar size={16} /> {w.range}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-indigo-200 font-bold">
+              <Heart size={20} className="text-pink-400" />
+              Avg Emotion
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-3xl font-black text-[var(--nura-text)]">{Math.round(avgScore)}</span>
+              <span className="text-[var(--nura-dim)] font-bold">/100</span>
+              {emotionChange !== null && (
+                <span className={`text-xs font-bold px-2 py-1 rounded-md ${
+                  emotionChange >= 0
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-red-500/10 text-red-400'
+                }`}>
+                  {emotionChange >= 0 ? '+' : ''}{emotionChange} vs last week
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-8">
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 text-indigo-200 font-bold">
-                  <Clock size={20} className="text-indigo-400" />
-                  Responsiveness
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--nura-dim)]/70">Most Active:</span>
-                    <span className="text-[var(--nura-text)] font-bold">{w.bestHour}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--nura-dim)]/70">Least Active:</span>
-                    <span className="text-[var(--nura-text)] font-bold">{w.worstHour}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--nura-dim)]/70">Sessions:</span>
-                    <span className="text-[var(--nura-text)] font-bold">{w.sessionCount}</span>
-                  </div>
-                </div>
-              </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-indigo-200 font-bold">
+              <Brain size={20} className="text-orange-400" />
+              Confusion
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-3xl font-black text-[var(--nura-text)]">{w.confusionCount}</span>
+              <span className="text-[var(--nura-dim)] font-bold">events</span>
+              {confusionChange !== null && (
+                <span className={`text-xs font-bold px-2 py-1 rounded-md ${
+                  confusionChange <= 0
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-red-500/10 text-red-400'
+                }`}>
+                  {confusionChange > 0 ? '+' : ''}{confusionChange} vs last week
+                </span>
+              )}
+            </div>
+          </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 text-indigo-200 font-bold">
-                  <Activity size={20} className="text-emerald-400" />
-                  Engagement
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-3xl font-black text-[var(--nura-text)]">{w.engagementLevel}%</span>
-                  {engagementChange !== null && (
-                    <span className={`text-xs font-bold px-2 py-1 rounded-md ${
-                      engagementChange >= 0
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-red-500/10 text-red-400'
-                    }`}>
-                      {engagementChange >= 0 ? '+' : ''}{engagementChange}% vs last week
-                    </span>
-                  )}
-                </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-indigo-200 font-bold">
+              <Clock size={20} className="text-indigo-400" />
+              Responsiveness
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--nura-dim)]/70">Most Active:</span>
+                <span className="text-[var(--nura-text)] font-bold">{w.bestHour}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--nura-dim)]/70">Least Active:</span>
+                <span className="text-[var(--nura-text)] font-bold">{w.worstHour}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--nura-dim)]/70">Sessions:</span>
+                <span className="text-[var(--nura-text)] font-bold">{w.sessionCount}</span>
               </div>
             </div>
+          </div>
 
-            {/* AI-generated insights */}
-            <div className="border-t border-white/5 pt-8">
-              <h4 className="flex items-center gap-2 text-sm font-bold text-[var(--nura-dim)] uppercase tracking-widest mb-4">
-                <Sparkles size={14} className="text-indigo-400" />
-                AI Caregiver Insights
-              </h4>
-
-              {isGenerating ? (
-                <div className="flex items-center gap-3 py-6 text-[var(--nura-dim)]">
-                  <Loader2 size={18} className="animate-spin text-indigo-400" />
-                  <span className="text-sm font-medium">Analysing session data…</span>
-                </div>
-              ) : insights && insights.length > 0 ? (
-                <ul className="space-y-3 text-indigo-100 leading-relaxed">
-                  {insights.map((insight, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 shrink-0" />
-                      <span className="text-sm">{insight}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : w.sessionCount === 0 ? (
-                <p className="text-[var(--nura-dim)] text-sm font-bold py-4">
-                  No sessions to analyse for this week.
-                </p>
-              ) : (
-                <div className="flex items-center gap-3 py-4 text-[var(--nura-dim)]">
-                  <Loader2 size={18} className="animate-spin text-indigo-400" />
-                  <span className="text-sm">Loading insights…</span>
-                </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-indigo-200 font-bold">
+              <Activity size={20} className="text-emerald-400" />
+              Engagement
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-3xl font-black text-[var(--nura-text)]">{w.engagementLevel}%</span>
+              {engagementChange !== null && (
+                <span className={`text-xs font-bold px-2 py-1 rounded-md ${
+                  engagementChange >= 0
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-red-500/10 text-red-400'
+                }`}>
+                  {engagementChange >= 0 ? '+' : ''}{engagementChange}% vs last week
+                </span>
               )}
             </div>
           </div>
