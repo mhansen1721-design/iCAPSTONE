@@ -369,86 +369,97 @@ export const CareCenter: React.FC<CareCenterProps> = ({
             <ArrowLeft size={20} className="text-[var(--nura-dim)]" />
           </button>
 
-          {/* Title */}
-          <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-black tracking-tight">Care Circle Hub</h2>
-            <p className="text-[10px] font-bold text-[var(--nura-dim)] uppercase tracking-widest">
-              Collaborative Care
-            </p>
+          {/* Prominent Patient Selector (Replaces static title) */}
+          <div className="flex-1 min-w-0 flex items-center">
+            {patients.length > 0 ? (
+              <div className="relative">
+                <button
+                  onClick={() => setPatientDropdownOpen(prev => !prev)}
+                  className="group flex items-center gap-3 bg-[var(--nura-card)] hover:bg-white/5 border border-white/10 hover:border-[var(--nura-accent)]/40 p-2 pr-5 rounded-[2rem] transition-all shadow-sm"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[var(--nura-accent)]/20 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-black text-[var(--nura-accent)]">
+                      {initials(activePatient?.name || (activePatient as any)?.full_name || '?')}
+                    </span>
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="text-[10px] font-black text-[var(--nura-dim)] uppercase tracking-widest leading-tight mb-0.5">
+                      Care Circle For
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-black tracking-tight text-[var(--nura-text)] leading-none truncate max-w-[200px] sm:max-w-[300px]">
+                        {activePatient?.name || (activePatient as any)?.full_name || 'Select Patient'}
+                      </h2>
+                      <ChevronDown size={16} className={`text-[var(--nura-dim)] group-hover:text-[var(--nura-accent)] transition-transform duration-200 ${patientDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Dropdown Menu */}
+                {patientDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[400]" onClick={() => setPatientDropdownOpen(false)} />
+                    <div className="absolute left-0 top-full mt-2 w-64 bg-[var(--nura-card)] rounded-2xl border border-white/10 shadow-2xl overflow-hidden z-[410] animate-in fade-in slide-in-from-top-2 duration-150">
+                      <p className="px-4 pt-3 pb-1.5 text-[9px] font-black uppercase tracking-widest text-[var(--nura-dim)]/60">
+                        Switch patient
+                      </p>
+                      {patients.map(p => {
+                        const pid = (p as any).patient_id || (p as any).id;
+                        const isSelected = String(pid) === String(selectedPatientId);
+                        return (
+                          <button
+                            key={pid}
+                            onClick={() => { setSelectedPatientId(String(pid)); setData(null); setPatientDropdownOpen(false); }}
+                            className={`w-full flex items-center gap-3 text-left px-4 py-3 text-sm font-bold transition-all ${
+                              isSelected
+                                ? 'bg-[var(--nura-accent)]/15 text-[var(--nura-accent)]'
+                                : 'text-[var(--nura-dim)] hover:bg-white/5 hover:text-[var(--nura-text)]'
+                            }`}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-[var(--nura-accent)]/30' : 'bg-white/10'}`}>
+                              <span className={`text-[10px] font-black ${isSelected ? 'text-[var(--nura-accent)]' : 'text-[var(--nura-dim)]'}`}>
+                                {initials(p.name || (p as any).full_name || '?')}
+                              </span>
+                            </div>
+                            <span className="truncate flex-1">{p.name || (p as any).full_name}</span>
+                            {isSelected && <Check size={14} className="shrink-0 text-[var(--nura-accent)]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-black tracking-tight">Care Circle Hub</h2>
+                <p className="text-[10px] font-bold text-[var(--nura-dim)] uppercase tracking-widest">
+                  Collaborative Care
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Sync button */}
-          <button onClick={() => fetchData(true)} disabled={isSyncing}
-            className="p-2.5 bg-[var(--nura-card)] hover:bg-white/5 rounded-full border border-white/10 transition-all disabled:opacity-40" title="Sync latest data">
-            <RefreshCw size={16} className={`text-[var(--nura-dim)] ${isSyncing ? 'animate-spin' : ''}`} />
-          </button>
+          {/* Right side actions (Sync & Access Code) */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Sync button */}
+            <button onClick={() => fetchData(true)} disabled={isSyncing}
+              className="p-2.5 bg-[var(--nura-card)] hover:bg-white/5 rounded-full border border-white/10 transition-all disabled:opacity-40" title="Sync latest data">
+              <RefreshCw size={16} className={`text-[var(--nura-dim)] ${isSyncing ? 'animate-spin' : ''}`} />
+            </button>
 
-          {/* Access code badge */}
-          {accessCode && (
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--nura-card)] rounded-2xl border border-[var(--nura-accent)]/20 shrink-0">
-              <Shield size={14} className="text-[var(--nura-accent)]" />
-              <span className="text-[10px] font-black text-[var(--nura-dim)] uppercase tracking-widest">Code</span>
-              <span className="font-mono font-black text-[var(--nura-accent)] tracking-[0.15em]">{accessCode}</span>
-              <button onClick={handleCopyCode} className="ml-1 p-1 hover:bg-white/10 rounded-lg transition-all">
-                {codeCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} className="text-[var(--nura-dim)]" />}
-              </button>
-            </div>
-          )}
-
-          {/* ── Patient Selector Dropdown (far right) ── */}
-          {patients.length > 0 && (
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setPatientDropdownOpen(prev => !prev)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[var(--nura-card)] rounded-2xl border border-white/10 hover:border-[var(--nura-accent)]/40 transition-all"
-              >
-                <div className="w-6 h-6 rounded-full bg-[var(--nura-accent)]/20 flex items-center justify-center shrink-0">
-                  <span className="text-[9px] font-black text-[var(--nura-accent)]">
-                    {initials(activePatient?.name || (activePatient as any)?.full_name || '?')}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-[var(--nura-text)] max-w-[120px] truncate">
-                  {activePatient?.name || (activePatient as any)?.full_name || 'Select Patient'}
-                </span>
-                <ChevronDown size={14} className={`text-[var(--nura-dim)] transition-transform duration-200 ${patientDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {patientDropdownOpen && (
-                <>
-                  {/* Backdrop to close on outside click */}
-                  <div className="fixed inset-0 z-[400]" onClick={() => setPatientDropdownOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-52 bg-[var(--nura-card)] rounded-2xl border border-white/10 shadow-2xl overflow-hidden z-[410] animate-in fade-in slide-in-from-top-2 duration-150">
-                    <p className="px-4 pt-3 pb-1.5 text-[9px] font-black uppercase tracking-widest text-[var(--nura-dim)]/60">
-                      Switch patient
-                    </p>
-                    {patients.map(p => {
-                      const pid = (p as any).patient_id || (p as any).id;
-                      const isSelected = String(pid) === String(selectedPatientId);
-                      return (
-                        <button
-                          key={pid}
-                          onClick={() => { setSelectedPatientId(String(pid)); setData(null); setPatientDropdownOpen(false); }}
-                          className={`w-full flex items-center gap-3 text-left px-4 py-3 text-sm font-bold transition-all ${
-                            isSelected
-                              ? 'bg-[var(--nura-accent)]/15 text-[var(--nura-accent)]'
-                              : 'text-[var(--nura-dim)] hover:bg-white/5 hover:text-[var(--nura-text)]'
-                          }`}
-                        >
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-[var(--nura-accent)]/30' : 'bg-white/10'}`}>
-                            <span className={`text-[9px] font-black ${isSelected ? 'text-[var(--nura-accent)]' : 'text-[var(--nura-dim)]'}`}>
-                              {initials(p.name || (p as any).full_name || '?')}
-                            </span>
-                          </div>
-                          <span className="truncate">{p.name || (p as any).full_name}</span>
-                          {isSelected && <Check size={12} className="ml-auto shrink-0 text-[var(--nura-accent)]" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+            {/* Access code badge */}
+            {accessCode && (
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-[var(--nura-card)] rounded-2xl border border-[var(--nura-accent)]/20">
+                <Shield size={14} className="text-[var(--nura-accent)] shrink-0" />
+                <span className="text-[10px] font-black text-[var(--nura-dim)] uppercase tracking-widest hidden md:inline">Code</span>
+                <span className="font-mono font-black text-[var(--nura-accent)] tracking-[0.15em]">{accessCode}</span>
+                <button onClick={handleCopyCode} className="ml-1 p-1 hover:bg-white/10 rounded-lg transition-all">
+                  {codeCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} className="text-[var(--nura-dim)]" />}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Top-level Tab Bar (centered) ── */}
