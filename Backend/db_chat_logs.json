@@ -442,6 +442,12 @@
                 "logged_by": "demo@gmail.com",
                 "end_reason": "early",
                 "transcript": []
+            },
+            {
+                "timestamp": "2026-03-20 18:52:52",
+                "logged_by": "demo@gmail.com",
+                "end_reason": "early",
+                "transcript": []
             }
         ]
     }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PatientProfile, AppSettings } from '../types';
 import { Mic, MicOff, Send, XCircle, ChevronRight, X } from 'lucide-react';
-// BookImage removed — no longer needed after auto-open scrapbook
 import { Avatar } from '../components/Avatar';
 
 interface Message {
@@ -55,16 +54,11 @@ function scorePhoto(photo: MemoryPhoto, query: string): number {
     .replace(/[^a-z0-9 ]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length >= 3 && !STOPWORDS.has(w));
-
   if (queryWords.length === 0) return 0;
-
   const haystack = (photo.description + ' ').toLowerCase();
   let score = 0;
   for (const word of queryWords) {
-    if (haystack.includes(word)) {
-      // Longer word matches count more
-      score += word.length >= 6 ? 3 : word.length >= 4 ? 2 : 1;
-    }
+    if (haystack.includes(word)) score += word.length >= 6 ? 3 : word.length >= 4 ? 2 : 1;
   }
   return score;
 }
@@ -74,7 +68,14 @@ function sortByRelevance(photos: MemoryPhoto[], query: string): MemoryPhoto[] {
   return [...photos].sort((a, b) => scorePhoto(b, query) - scorePhoto(a, query));
 }
 
-// ── Scrapbook — full-screen one-by-one photo viewer ───────────────────────────
+// ── Pause tolerance map ───────────────────────────────────────────────────────
+const PAUSE_TOLERANCE_MS: Record<string, number> = {
+  short:  2000,
+  medium: 5000,
+  long:   10000,
+};
+
+// ── Scrapbook ─────────────────────────────────────────────────────────────────
 const Scrapbook: React.FC<{
   patientId: string;
   caregiverEmail: string;
@@ -90,8 +91,7 @@ const Scrapbook: React.FC<{
   const photosRef  = useRef<MemoryPhoto[]>([]);
   const recRef     = useRef<any>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose; // always current, never stale
-  // Always-current action refs — voice handler calls through these
+  onCloseRef.current = onClose;
   const goNextRef  = useRef<() => void>(() => {});
   const closeRef   = useRef<() => void>(() => {});
 
@@ -104,18 +104,15 @@ const Scrapbook: React.FC<{
     }, 250);
   }, []);
 
-  // handleClose has no deps — reads onClose through onCloseRef so it's always stable
   const handleClose = useCallback(() => {
     try { recRef.current?.stop(); } catch {}
     setVisible(false);
     setTimeout(() => onCloseRef.current(), 350);
   }, []);
 
-  // Update action refs on every render
   goNextRef.current = goNext;
   closeRef.current  = handleClose;
 
-  // Fetch photos once on mount
   useEffect(() => {
     (async () => {
       try {
@@ -134,30 +131,19 @@ const Scrapbook: React.FC<{
     })();
   }, []);
 
-  // Voice recognition — started once, calls through refs so never stale
   useEffect(() => {
     if (!SpeechRecognition) return;
     const rec = new SpeechRecognition();
-    rec.continuous     = true;
-    rec.interimResults = false;
-    rec.lang           = 'en-US';
-    recRef.current     = rec;
-
+    rec.continuous = true; rec.interimResults = false; rec.lang = 'en-US';
+    recRef.current = rec;
     rec.onresult = (event: any) => {
-      const last   = event.results[event.results.length - 1];
-      const spoken = last[0].transcript.toLowerCase().trim();
-      if (/\bnext\b/.test(spoken))                                       goNextRef.current();
+      const spoken = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+      if (/\bnext\b/.test(spoken)) goNextRef.current();
       if (/\b(close|back|done|exit|stop|finish|return|chat)\b/.test(spoken)) closeRef.current();
     };
-
-    rec.onend = () => {
-      try { rec.start(); } catch {}
-    };
-
+    rec.onend = () => { try { rec.start(); } catch {} };
     try { rec.start(); } catch {}
-    return () => {
-      try { rec.stop(); } catch {}
-    };
+    return () => { try { rec.stop(); } catch {} };
   }, []);
 
   const photo = photos[index];
@@ -176,52 +162,29 @@ const Scrapbook: React.FC<{
         </div>
       ) : (
         <>
-          {/* Close — top-left */}
-          <button
-            onClick={handleClose}
-            className="absolute top-6 left-6 z-10 w-20 h-20 rounded-full bg-white/15 hover:bg-white/30 flex items-center justify-center transition-all active:scale-90 shadow-2xl"
-          >
+          <button onClick={handleClose}
+            className="absolute top-6 left-6 z-10 w-20 h-20 rounded-full bg-white/15 hover:bg-white/30 flex items-center justify-center transition-all active:scale-90 shadow-2xl">
             <X size={42} className="text-white" strokeWidth={2.5} />
           </button>
-
-          {/* Counter — top-right */}
-          <p className="absolute top-10 right-8 text-white/40 text-xl font-black tabular-nums">
-            {index + 1} / {photos.length}
-          </p>
-
-          {/* Instructions — top-centre */}
+          <p className="absolute top-10 right-8 text-white/40 text-xl font-black tabular-nums">{index + 1} / {photos.length}</p>
           <p className="absolute top-10 left-1/2 -translate-x-1/2 text-white/50 text-sm md:text-base font-black uppercase tracking-widest whitespace-nowrap select-none">
             Say <span className="text-white">"Next"</span> to see more &nbsp;·&nbsp; <span className="text-white">"Close"</span> to return to chat
           </p>
-
-          {/* Photo + caption */}
-          <div
-            key={index}
+          <div key={index}
             className={`flex flex-col items-center px-6 transition-all duration-200 ${animDir === 'in' ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
-            style={{ maxWidth: '90vw', maxHeight: '80vh' }}
-          >
+            style={{ maxWidth: '90vw', maxHeight: '80vh' }}>
             {promptText && scorePhoto(photo, promptText) > 0 && (
               <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/30">matched your request</p>
             )}
-            <img
-              src={photo.url}
-              alt={photo.description || 'Memory'}
-              className="rounded-3xl shadow-2xl object-contain"
-              style={{ maxHeight: '60vh', maxWidth: '85vw' }}
-            />
+            <img src={photo.url} alt={photo.description || 'Memory'}
+              className="rounded-3xl shadow-2xl object-contain" style={{ maxHeight: '60vh', maxWidth: '85vw' }} />
             {photo.description && (
-              <p className="mt-6 text-white text-2xl md:text-3xl font-bold text-center leading-snug max-w-xl">
-                {photo.description}
-              </p>
+              <p className="mt-6 text-white text-2xl md:text-3xl font-bold text-center leading-snug max-w-xl">{photo.description}</p>
             )}
           </div>
-
-          {/* Next — bottom-right */}
           {photos.length > 1 && (
-            <button
-              onClick={goNext}
-              className="absolute bottom-10 right-8 w-28 h-28 rounded-full bg-white/15 hover:bg-white/30 flex items-center justify-center transition-all active:scale-90 shadow-2xl"
-            >
+            <button onClick={goNext}
+              className="absolute bottom-10 right-8 w-28 h-28 rounded-full bg-white/15 hover:bg-white/30 flex items-center justify-center transition-all active:scale-90 shadow-2xl">
               <ChevronRight size={64} className="text-white" strokeWidth={2.5} />
             </button>
           )}
@@ -233,16 +196,19 @@ const Scrapbook: React.FC<{
 
 // ── Main ChatView ─────────────────────────────────────────────────────────────
 export const ChatView: React.FC<ChatViewProps> = ({
-  patient,
-  settings,
-  durationMinutes,
-  caregiverEmail,
-  caregiverPassword,
-  onBack,
-  onLogout,
+  patient, settings, durationMinutes, caregiverEmail, caregiverPassword, onBack, onLogout,
 }) => {
   if (!patient) return null;
 
+  const p = patient as any;
+
+  // ── Listening profile settings ─────────────────────────────────────────────
+  const pauseToleranceKey: string = p.pauseTolerance || p.pause_tolerance || 'medium';
+  const pauseMs:     number  = PAUSE_TOLERANCE_MS[pauseToleranceKey] ?? 5000;
+  const softSpoken:  boolean = p.softSpokenMode  ?? p.soft_spoken_mode  ?? false;
+  const interactiveMode: boolean = p.interactiveMode ?? p.interactive_mode ?? true;
+
+  // ── State ──────────────────────────────────────────────────────────────────
   const [messages, setMessages]                   = useState<Message[]>([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [inputText, setInputText]                 = useState('');
@@ -251,31 +217,41 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [showExitConfirm, setShowExitConfirm]     = useState(false);
   const [llmStatus, setLlmStatus]                 = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
   const [showScrapbook, setShowScrapbook]         = useState(false);
-  // Stable ref-backed callback so Scrapbook's handleClose never goes stale
-  const closeScrapbookRef = useRef<() => void>(() => {});
-  const closeScrapbook = useCallback(() => setShowScrapbook(false), []);
-  closeScrapbookRef.current = closeScrapbook;
   const [photoPromptText, setPhotoPromptText]     = useState('');
 
+  // ── Interactive mode audio state ───────────────────────────────────────────
+  // soundLevel: 0–100, driven by AudioContext analyser
+  const [soundLevel, setSoundLevel] = useState(0);
+
+  // ── Refs ───────────────────────────────────────────────────────────────────
   const recognitionRef    = useRef<any>(null);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesRef       = useRef<Message[]>([]);
   const messagesEndRef    = useRef<HTMLDivElement>(null);
   const alertFiredRef     = useRef(false);
   const sendingRef        = useRef(false);
+  const closeScrapbookRef = useRef<() => void>(() => {});
+  const audioCtxRef       = useRef<AudioContext | null>(null);
+  const animFrameRef      = useRef<number | null>(null);
+  const streamRef         = useRef<MediaStream | null>(null);
 
-  const patientId   = (patient as any).patient_id || (patient as any).id;
-  const patientName = patient.name || (patient as any).full_name || 'Friend';
-  const rawTopics   = patient.safeTopics || (patient as any).approved_topics || [];
+  const closeScrapbook = useCallback(() => setShowScrapbook(false), []);
+  closeScrapbookRef.current = closeScrapbook;
+
+  const patientId   = p.patient_id || p.id;
+  const patientName = patient.name || p.full_name || 'Friend';
+  const rawTopics   = patient.safeTopics || p.approved_topics || [];
   const topics: string[] = Array.isArray(rawTopics)
     ? rawTopics.map((t: any) => (typeof t === 'string' ? t.trim() : '')).filter((t: string) => t.length > 1 && isNaN(Number(t)))
     : [];
 
+  // ── Scroll on message change ───────────────────────────────────────────────
   useEffect(() => {
     messagesRef.current = messages;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, currentTranscript, isAiTyping]);
 
+  // ── LLM warmup & status ────────────────────────────────────────────────────
   useEffect(() => { fetch('http://127.0.0.1:8000/llm/warmup').catch(() => {}); }, []);
 
   useEffect(() => {
@@ -295,12 +271,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
     return () => clearInterval(id);
   }, [llmStatus]);
 
+  // ── Session timer ──────────────────────────────────────────────────────────
   useEffect(() => {
     const id = setTimeout(() => handleFinalExit('completed'), durationMinutes * 60 * 1000);
     return () => clearTimeout(id);
   }, [durationMinutes]);
 
-  // Chat speech recognition — created once, stopped while scrapbook is open
+  // ── Speech recognition setup (created once) ────────────────────────────────
   useEffect(() => {
     if (!SpeechRecognition) return;
     const rec = new SpeechRecognition();
@@ -315,9 +292,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
         transcript += event.results[i][0].transcript;
       setCurrentTranscript(transcript);
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+      // Use the per-patient pause tolerance instead of hardcoded 4000ms
       silenceTimeoutRef.current = setTimeout(() => {
         if (transcript.trim()) handleSendMessage(transcript);
-      }, 4000);
+      }, pauseMs);
     };
     rec.onstart = () => setIsListening(true);
     rec.onend   = () => setIsListening(false);
@@ -326,19 +304,89 @@ export const ChatView: React.FC<ChatViewProps> = ({
       try { rec.stop(); } catch {}
       recognitionRef.current = null;
     };
-  }, []); // create once only
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ^ pauseMs intentionally not in deps — keep recognition stable, timeout
+  //   value is captured fresh each onresult call via closure over pauseMs
 
-  // Pause/resume mic when scrapbook opens or closes
+  // ── Pause/resume mic when scrapbook opens ─────────────────────────────────
   useEffect(() => {
     const rec = recognitionRef.current;
     if (!rec) return;
-    if (showScrapbook) {
-      // Scrapbook is taking the mic — stop chat recognition
-      try { rec.stop(); } catch {}
-    }
-    // When scrapbook closes the user presses the button to resume — no auto-start
+    if (showScrapbook) { try { rec.stop(); } catch {} }
   }, [showScrapbook]);
 
+  // ── Interactive mode + Soft Spoken: AudioContext analyser ──────────────────
+  // Started when mic is active, torn down when mic stops or scrapbook opens.
+  useEffect(() => {
+    if (!isListening || showScrapbook) {
+      // Tear down audio context
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      audioCtxRef.current?.close().catch(() => {});
+      audioCtxRef.current = null;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      setSoundLevel(0);
+      return;
+    }
+
+    // Only spin up AudioContext if at least one feature needs it
+    if (!interactiveMode && !softSpoken) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+
+        streamRef.current = stream;
+        const ctx = new AudioContext();
+        audioCtxRef.current = ctx;
+
+        const source   = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.75;
+
+        if (softSpoken) {
+          // Boost quiet voices so the analyser detects them reliably
+          const gain = ctx.createGain();
+          gain.gain.value = 3.5;
+          source.connect(gain);
+          gain.connect(analyser);
+        } else {
+          source.connect(analyser);
+        }
+
+        if (interactiveMode) {
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          const tick = () => {
+            if (cancelled) return;
+            analyser.getByteFrequencyData(data);
+            // Average of frequency bins, scaled to 0-100
+            const avg = data.reduce((a, b) => a + b, 0) / data.length;
+            setSoundLevel(Math.min(100, avg * 2.8));
+            animFrameRef.current = requestAnimationFrame(tick);
+          };
+          tick();
+        }
+      } catch {
+        // Mic permission denied or unavailable — silent fallback
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      audioCtxRef.current?.close().catch(() => {});
+      audioCtxRef.current = null;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      setSoundLevel(0);
+    };
+  }, [isListening, showScrapbook, interactiveMode, softSpoken]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
   const toggleListening = () => {
     if (!recognitionRef.current) return;
     if (isListening) {
@@ -361,7 +409,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: caregiverEmail.toLowerCase().trim(), password: caregiverPassword,
-          patient_id: patientId, full_name: patient.full_name || patient.name,
+          patient_id: patientId, full_name: patient.name || p.full_name,
           messages: messagesRef.current, end_reason, had_alert: alertFiredRef.current,
         }),
       });
@@ -406,7 +454,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.ui_signal === 'ALERT') alertFiredRef.current = true;
-      setMessages(prev => [...prev, { sender: 'ai', text: data.response_text, timestamp: new Date().toISOString(), isAlert: data.ui_signal === 'ALERT' }]);
+      setMessages(prev => [...prev, {
+        sender: 'ai', text: data.response_text,
+        timestamp: new Date().toISOString(), isAlert: data.ui_signal === 'ALERT',
+      }]);
       if (wantsPhotos) { setPhotoPromptText(val); setShowScrapbook(true); }
     } catch {
       setMessages(prev => [...prev, { sender: 'ai', text: getRuleBasedResponse(val), timestamp: new Date().toISOString() }]);
@@ -425,9 +476,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
   const getRuleBasedResponse = (userText: string): string => {
     const lower  = userText.toLowerCase();
-    const bucket = /don't know|confused|lost|where am i|forgot/.test(lower) ? 'confused' : /scared|lonely|cry|hurt|frustrated|alone|worried/.test(lower) ? 'distressed' : 'general';
-    const pool   = RULE_BASED[bucket];
-    const idx    = fallbackCounterRef.current[bucket] % pool.length;
+    const bucket = /don't know|confused|lost|where am i|forgot/.test(lower) ? 'confused'
+      : /scared|lonely|cry|hurt|frustrated|alone|worried/.test(lower) ? 'distressed' : 'general';
+    const pool = RULE_BASED[bucket];
+    const idx  = fallbackCounterRef.current[bucket] % pool.length;
     fallbackCounterRef.current[bucket] += 1;
     return pool[idx];
   };
@@ -435,17 +487,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const msgSize = () => settings.fontSize === 'small' ? 'text-xl md:text-2xl' : settings.fontSize === 'large' ? 'text-4xl md:text-5xl leading-tight' : 'text-2xl md:text-3xl';
   const hdrSize = () => settings.fontSize === 'small' ? 'text-4xl md:text-6xl' : settings.fontSize === 'large' ? 'text-6xl md:text-8xl' : 'text-5xl md:text-7xl';
 
+  // ── Interactive mode visual helpers ────────────────────────────────────────
+  // isSounding: true when voice energy is above idle threshold
+  const isSounding = interactiveMode && isListening && soundLevel > 12;
+  // intensity: 0-1 normalised above the detection threshold
+  const intensity  = isSounding ? Math.min(1, (soundLevel - 12) / 60) : 0;
+
+  // Glow ring colour transitions: quiet → indigo, medium → violet, loud → purple
+  const ringOpacity  = isSounding ? 0.25 + intensity * 0.55 : 0;
+  const ringBlur     = isSounding ? 40 + intensity * 60 : 30;
+  const ringScale    = (!settings.reducedMotion && isSounding) ? 1 + intensity * 0.18 : 1;
+  const borderOpacity = isSounding ? 0.5 + intensity * 0.5 : isListening ? 0.15 : 0;
+
+  // Avatar emotion: talking when voice detected, happy when AI is responding
+  const avatarEmotion = isAiTyping ? 'happy' : isSounding ? 'talking' : 'neutral';
+
   return (
     <div className="w-full h-screen h-[100dvh] flex flex-col bg-[var(--nura-bg)] text-[var(--nura-text)] overflow-hidden fixed inset-0 z-[100] pointer-events-auto">
 
       {/* ── SCRAPBOOK ── */}
       {showScrapbook && (
-        <Scrapbook
-          patientId={patientId}
-          caregiverEmail={caregiverEmail}
-          promptText={photoPromptText}
-          onClose={closeScrapbook}
-        />
+        <Scrapbook patientId={patientId} caregiverEmail={caregiverEmail}
+          promptText={photoPromptText} onClose={closeScrapbook} />
       )}
 
       {/* ── EXIT MODAL ── */}
@@ -465,14 +528,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* ── HEADER ── */}
       <header className="p-6 flex justify-between items-center shrink-0">
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border ${
-          llmStatus === 'ready'   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-          llmStatus === 'offline' || llmStatus === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-          'bg-amber-500/10 border-amber-500/30 text-amber-400'
+          llmStatus === 'ready'   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+          : llmStatus === 'offline' || llmStatus === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400'
+          : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
         }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${llmStatus === 'ready' ? 'bg-emerald-400' : llmStatus === 'offline' || llmStatus === 'error' ? 'bg-red-400' : 'bg-amber-400 animate-pulse'}`} />
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            llmStatus === 'ready' ? 'bg-emerald-400'
+            : llmStatus === 'offline' || llmStatus === 'error' ? 'bg-red-400'
+            : 'bg-amber-400 animate-pulse'
+          }`} />
           {llmStatus === 'ready' ? 'AI Ready' : llmStatus === 'offline' ? 'AI Offline' : llmStatus === 'error' ? 'AI Error' : 'AI Loading…'}
         </div>
-        <button onClick={() => setShowExitConfirm(true)} className="px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-full font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+        <button onClick={() => setShowExitConfirm(true)}
+          className="px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-full font-black text-xs uppercase tracking-widest transition-all active:scale-95">
           End Session
         </button>
       </header>
@@ -490,11 +558,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
           <div className={`flex-1 overflow-y-auto flex flex-col gap-5 scrollbar-hide pr-2 ${messages.length === 0 && !currentTranscript ? 'opacity-0' : 'opacity-100'}`}>
             {messages.map((msg, i) => (
-              <div key={i} className={`${msgSize()} font-bold tracking-tight ${msg.sender === 'patient' ? 'text-[var(--nura-text)]/80 text-right' : 'text-[var(--nura-dim)] text-left'}`}>
+              <div key={i} className={`${msgSize()} font-bold tracking-tight ${
+                msg.sender === 'patient' ? 'text-[var(--nura-text)]/80 text-right' : 'text-[var(--nura-dim)] text-left'
+              }`}>
                 {msg.text}
               </div>
             ))}
-
             {currentTranscript && (
               <div className={`${msgSize()} text-[var(--nura-text)]/30 italic text-right animate-pulse`}>{currentTranscript}</div>
             )}
@@ -509,21 +578,81 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         {/* Avatar Side */}
         <div className="w-full md:w-2/5 flex flex-col items-center justify-center shrink-0 py-6">
-          <div className="relative mb-8">
-            {isListening && <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-[80px] animate-pulse" />}
-            <div className={`transition-transform duration-500 ${isAiTyping || isListening ? 'scale-110' : 'scale-100'}`}>
-              <Avatar size="2xl" type={patient.avatarType} emotion={isAiTyping ? 'happy' : 'neutral'} reducedMotion={settings.reducedMotion} />
+
+          {/* ── Avatar with interactive glow ring ── */}
+          <div className="relative mb-8 flex items-center justify-center">
+
+            {/* Outer diffuse glow — colour-only in reduced motion, also scales otherwise */}
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                background: `radial-gradient(circle, rgba(99,102,241,${ringOpacity}) 0%, rgba(139,92,246,${ringOpacity * 0.6}) 45%, transparent 75%)`,
+                filter:    `blur(${ringBlur}px)`,
+                transform: `scale(${ringScale})`,
+                transition: settings.reducedMotion
+                  ? 'background 0.15s, opacity 0.15s'
+                  : 'background 0.06s, filter 0.06s, transform 0.06s',
+              }}
+            />
+
+            {/* Sharp border ring — always colour-only (safe for reduced motion) */}
+            <div
+              className="absolute inset-[-10px] rounded-full pointer-events-none"
+              style={{
+                border:       `3px solid rgba(99,102,241,${borderOpacity})`,
+                boxShadow:    borderOpacity > 0
+                  ? `0 0 ${14 + intensity * 20}px rgba(99,102,241,${borderOpacity * 0.7}), inset 0 0 ${8 + intensity * 12}px rgba(139,92,246,${borderOpacity * 0.3})`
+                  : 'none',
+                transition:   'border-color 0.08s, box-shadow 0.08s',
+              }}
+            />
+
+            {/* Avatar — scale only when reduced motion is OFF */}
+            <div
+              className="relative z-10"
+              style={{
+                transform: !settings.reducedMotion
+                  ? `scale(${isAiTyping || isListening ? (isSounding ? 1.05 + intensity * 0.08 : 1.1) : 1})`
+                  : undefined,
+                transition: !settings.reducedMotion ? 'transform 0.08s' : undefined,
+              }}
+            >
+              <Avatar
+                size="2xl"
+                type={patient.avatarType}
+                emotion={avatarEmotion}
+                reducedMotion={settings.reducedMotion}
+              />
             </div>
+
+            {/* Soft Spoken indicator badge */}
+            {softSpoken && isListening && (
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1 bg-amber-500/20 border border-amber-500/30 rounded-full backdrop-blur-sm z-20">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-amber-400">Soft Spoken</span>
+              </div>
+            )}
           </div>
+
+          {/* Mic button */}
           <button
             onClick={toggleListening}
-            className={`px-10 py-6 rounded-full flex items-center justify-center gap-4 border-2 transition-all w-full max-w-sm shadow-2xl active:scale-95 ${isListening ? 'bg-red-500 border-red-400' : 'bg-[var(--nura-accent)] border-[var(--nura-accent)] hover:bg-[var(--nura-accent)]/80'}`}
+            className={`px-10 py-6 rounded-full flex items-center justify-center gap-4 border-2 transition-all w-full max-w-sm shadow-2xl active:scale-95 ${
+              isListening
+                ? 'bg-red-500 border-red-400'
+                : 'bg-[var(--nura-accent)] border-[var(--nura-accent)] hover:bg-[var(--nura-accent)]/80'
+            }`}
           >
             {isListening
               ? <><MicOff size={32} className="text-white" /><span className="text-xl font-black text-white">FINISH TALKING</span></>
               : <><Mic size={32} className="text-[var(--nura-bg)]" /><span className="text-xl font-black uppercase tracking-tight text-[var(--nura-bg)]">Click me to speak</span></>
             }
           </button>
+
+          {/* Pause tolerance indicator (subtle, for caregiver reference) */}
+          <p className="mt-3 text-[9px] font-bold uppercase tracking-widest text-[var(--nura-text)]/20">
+            {pauseToleranceKey === 'short' ? '⚡ Quick response' : pauseToleranceKey === 'long' ? '🐢 Extended pause' : ''}
+          </p>
         </div>
       </div>
 
@@ -542,8 +671,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           )}
           <div className="flex items-center gap-4 bg-[var(--nura-card)] p-2 rounded-full border border-white/10 backdrop-blur-xl">
-            <input
-              type="text" value={inputText}
+            <input type="text" value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !isAiTyping && handleSendMessage()}
               placeholder="Type here..."

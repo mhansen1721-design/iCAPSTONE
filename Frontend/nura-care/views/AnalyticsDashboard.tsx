@@ -86,18 +86,62 @@ const POSITIVE_KW = [
 
 // ─── Stop words for keyword extraction ───────────────────────────────────────
 const STOP = new Set([
-  "i","me","my","we","our","you","your","he","she","it","they","them",
-  "this","that","these","those","is","are","was","were","be","been",
-  "being","have","has","had","do","does","did","will","would","could",
-  "should","may","might","can","to","of","in","for","on","with","at",
-  "by","from","as","into","through","about","before","after","a","an",
-  "the","and","but","or","so","not","no","just","very","really","also",
-  "up","out","if","then","than","too","when","what","who","which",
-  "there","here","how","all","some","like","well","oh","yes","yeah",
-  "ok","okay","um","know","think","want","feel","going","get","got",
-  "go","come","see","said","say","tell","think","make","let","time",
-  "im","its","thats","dont","cant","wont","didnt","ive","ill","id",
-  "dont","its","its","more","one","two","three","her","his","their",
+  // Pronouns
+  "i","me","my","myself","we","our","ours","ourselves","you","your","yours",
+  "yourself","he","him","his","himself","she","her","hers","herself",
+  "it","its","itself","they","them","their","theirs","themselves",
+  // Demonstratives / articles
+  "this","that","these","those","a","an","the",
+  // To be / auxiliaries
+  "is","are","was","were","be","been","being","am",
+  "have","has","had","having","do","does","did","doing",
+  "will","would","could","should","may","might","can","shall","must",
+  // Prepositions / conjunctions
+  "to","of","in","for","on","with","at","by","from","as","into",
+  "through","about","before","after","between","against","during",
+  "without","within","along","following","across","behind","beyond",
+  "and","but","or","nor","so","yet","both","either","neither","if",
+  "then","than","though","although","because","since","while","when",
+  "where","which","who","whom","whose","what","how","whether","until",
+  // Common adverbs / fillers
+  "not","no","nor","up","out","too","very","really","also","just",
+  "still","here","there","now","then","already","always","never",
+  "sometimes","often","again","almost","even","ever","quite","rather",
+  "soon","yet","today","tomorrow","yesterday","back","away","around",
+  "maybe","perhaps","probably","actually","certainly","definitely",
+  "usually","generally","basically","literally","totally","anyway",
+  // Common verbs that add no topic signal
+  "go","goes","going","went","gone","get","gets","getting","got",
+  "come","comes","coming","came","make","makes","making","made",
+  "let","lets","know","knows","knowing","knew","think","thinks",
+  "thinking","thought","want","wants","wanting","wanted","feel","feels",
+  "feeling","felt","see","sees","seeing","saw","seen","say","says",
+  "saying","said","tell","tells","telling","told","ask","asked","use",
+  "used","using","try","tried","trying","put","take","takes","took",
+  "seem","seems","seemed","look","looks","looked","need","needs",
+  "talk","talking","talked","spoke","speak","speaking","call","called",
+  "keep","kept","give","gave","find","found","show","showed","start",
+  "help","hope","mean","work","works","working","worked","play",
+  "like","love","care","wish","wonder","happen","happens","happened",
+  // Contractions (after apostrophe stripping)
+  "im","ive","id","ill","its","isnt","arent","wasnt","werent",
+  "dont","doesnt","didnt","wont","wouldnt","couldnt","shouldnt",
+  "cant","cannot","lets","thats","whats","whos","theres","heres",
+  "theyre","youre","were","hed","shed","theyd","wed","youd",
+  // Greetings / conversation openers
+  "hi","hey","hello","oh","ah","um","uh","hmm","hm","wow","ok",
+  "okay","yes","yeah","yep","nope","nah","sure","right","well",
+  "so","now","nice","good","great","fine","okay","thanks","thank",
+  "please","sorry","excuse","pardon",
+  // Quantity / misc
+  "one","two","three","four","five","more","much","many","few",
+  "less","most","some","any","all","every","each","other","another",
+  "same","different","thing","things","something","anything","nothing",
+  "everything","someone","anyone","everyone","nobody","somebody",
+  "lot","lots","bit","little","big","small","long","day","days",
+  "time","times","way","ways","place","part","parts","kind","sort",
+  "type","point","fact","case","side","end","new","old","own",
+  "just","even","also","though","however","instead","unless","since",
 ]);
 
 const KEYWORD_COLORS = [
@@ -212,11 +256,11 @@ function computeWeekData(
       if (TIER2_KW.some(kw => l.includes(kw))) distressCount++;
       if (['confused','lost','forgot','don\'t know','don\'t remember','where am i'].some(kw => l.includes(kw))) confusionCount++;
 
-      // Keyword extraction
+      // Keyword extraction — strip ALL apostrophes so "let's"→"lets" etc. hit STOP
       const words = msg.text.toLowerCase().replace(/[^a-z\s']/g, '').split(/\s+/);
       for (const w of words) {
-        const clean = w.replace(/^'+|'+$/g, '');
-        if (clean.length > 2 && !STOP.has(clean)) {
+        const clean = w.replace(/'/g, '');   // strip all apostrophes (internal + edge)
+        if (clean.length > 3 && !STOP.has(clean)) {
           wordFreq[clean] = (wordFreq[clean] || 0) + 1;
         }
       }
@@ -357,6 +401,300 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     </div>
   );
 };
+
+// ─── Report generator ─────────────────────────────────────────────────────────
+function generateReport({
+  patient, w, avgScore, insights, emotionChange, confusionChange, engagementChange,
+}: {
+  patient: PatientProfile;
+  w: WeekData;
+  avgScore: number;
+  insights: WeeklyInsights | undefined;
+  emotionChange: number | null;
+  confusionChange: number | null;
+  engagementChange: number | null;
+}) {
+  const p = patient as any;
+  const name       = p.name       || p.full_name     || 'Unknown Patient';
+  const dob        = p.date_of_birth || p.dob        || null;
+  const diagnosis  = p.diagnosis  || p.condition     || null;
+  const caregiver  = p.caregiver_name || p.caregiver || null;
+  const phone      = p.phone      || p.contact_phone || null;
+  const notes      = p.notes      || p.care_notes    || null;
+  const generated  = new Date().toLocaleString(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  // Emotion bar for each day
+  const dayRows = w.emotionByDay.map(d => {
+    const barW = d.hasData ? Math.round(d.score) : 0;
+    const barColor = d.score >= 68 ? '#22c55e' : d.score >= 48 ? '#6366f1' : d.score >= 36 ? '#f59e0b' : '#ef4444';
+    return `
+      <tr>
+        <td style="padding:6px 12px 6px 0;font-weight:700;color:#374151;width:40px">${d.day}</td>
+        <td style="padding:6px 8px">
+          ${d.hasData
+            ? `<div style="background:#e5e7eb;border-radius:4px;height:14px;overflow:hidden">
+                 <div style="background:${barColor};height:100%;width:${barW}%;border-radius:4px;transition:width 0.3s"></div>
+               </div>`
+            : `<span style="color:#9ca3af;font-size:11px">No session</span>`}
+        </td>
+        <td style="padding:6px 0 6px 8px;text-align:right;font-weight:600;color:#374151;white-space:nowrap">
+          ${d.hasData ? `${d.emoji} ${d.emotion} (${d.score})` : '—'}
+        </td>
+      </tr>`;
+  }).join('');
+
+  // Keywords
+  const keywordBadges = w.keywords.map(k =>
+    `<span style="display:inline-block;background:#ede9fe;color:#4f46e5;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;margin:3px">${k.text} ×${k.count}</span>`
+  ).join('');
+
+  // Alert events
+  const alertSection = w.alertEvents.length > 0
+    ? w.alertEvents.map(evt => {
+        const d = parseDate(evt.timestamp);
+        return `<li style="margin-bottom:8px"><strong style="color:#dc2626">"${evt.trigger}"</strong> — ${d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})} at ${d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</li>`;
+      }).join('')
+    : '<li style="color:#16a34a">✓ No emergency alerts detected this week.</li>';
+
+  // Change badge helper
+  const changeBadge = (val: number | null, invertGood = false) => {
+    if (val === null) return '';
+    const good = invertGood ? val <= 0 : val >= 0;
+    const color = good ? '#16a34a' : '#dc2626';
+    const bg    = good ? '#dcfce7' : '#fee2e2';
+    return `<span style="background:${bg};color:${color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:8px">${val >= 0 ? '+' : ''}${val}</span>`;
+  };
+
+  // AI insights sections
+  const insightSummary = insights?.generalSummary
+    ? `<p style="color:#1f2937;line-height:1.7;margin:0">${insights.generalSummary}</p>`
+    : '<p style="color:#6b7280;font-style:italic;margin:0">Insights not available for this week.</p>';
+
+  const insightConversations = (insights?.notableConversations?.length ?? 0) > 0
+    ? insights!.notableConversations.map(c => `<li style="margin-bottom:6px;color:#374151">${c}</li>`).join('')
+    : '<li style="color:#9ca3af;font-style:italic">None recorded.</li>';
+
+  const insightRecs = (insights?.caregiverRecommendations?.length ?? 0) > 0
+    ? insights!.caregiverRecommendations.map(r =>
+        `<li style="margin-bottom:8px;padding-left:8px;border-left:3px solid #6366f1;color:#1f2937">${r}</li>`
+      ).join('')
+    : '<li style="color:#9ca3af;font-style:italic">No specific recommendations this week.</li>';
+
+  // Daily message mini-chart (text-based)
+  const maxCount = Math.max(...w.dailyMessageCounts, 1);
+  const msgRows = DAY_LABELS.map((day, i) => {
+    const c = w.dailyMessageCounts[i];
+    const pct = Math.round((c / maxCount) * 100);
+    return `
+      <tr>
+        <td style="padding:4px 10px 4px 0;font-weight:700;color:#374151;width:36px;font-size:12px">${day}</td>
+        <td style="padding:4px 6px">
+          <div style="background:#e5e7eb;border-radius:4px;height:10px;overflow:hidden">
+            <div style="background:#6366f1;height:100%;width:${pct}%;border-radius:4px"></div>
+          </div>
+        </td>
+        <td style="padding:4px 0 4px 8px;text-align:right;color:#6b7280;font-size:12px;width:30px">${c}</td>
+      </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weekly Care Report — ${name} — ${w.range}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { max-width: 820px; margin: 0 auto; padding: 48px 40px; background: #fff; }
+    h1  { font-size: 26px; font-weight: 900; color: #111827; }
+    h2  { font-size: 16px; font-weight: 800; color: #1f2937; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid #e5e7eb; display: flex; align-items: center; gap: 8px; }
+    h2 .icon { display: inline-block; width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; }
+    section { margin-bottom: 32px; }
+    table { width: 100%; border-collapse: collapse; }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    @media (min-width: 600px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+    .stat-card { background: #f3f4f6; border-radius: 12px; padding: 16px; }
+    .stat-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 900; color: #111827; line-height: 1; }
+    .stat-sub   { font-size: 11px; color: #6b7280; margin-top: 4px; }
+    .alert-box  { border-radius: 12px; padding: 16px 20px; margin-bottom: 0; }
+    .alert-ok   { background: #f0fdf4; border: 1.5px solid #86efac; }
+    .alert-warn { background: #fef2f2; border: 1.5px solid #fca5a5; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 4px; }
+    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+    @media print {
+      body { background: #fff; }
+      .page { padding: 20px; max-width: 100%; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Print button (hidden on print) -->
+  <div class="no-print" style="text-align:right;margin-bottom:24px">
+    <button onclick="window.print()" style="background:#6366f1;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">
+      🖨 Print / Save as PDF
+    </button>
+  </div>
+
+  <!-- ── Header ── -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px;gap:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.15em;color:#6366f1;margin-bottom:6px">Weekly Care Report</div>
+      <h1 style="margin-bottom:4px">${name}</h1>
+      <p style="color:#6b7280;font-size:14px">📅 ${w.range}</p>
+    </div>
+    <div style="text-align:right;font-size:12px;color:#9ca3af">
+      <div>Generated</div>
+      <div style="font-weight:700;color:#6b7280">${generated}</div>
+    </div>
+  </div>
+
+  <!-- ── Patient Details ── -->
+  <section>
+    <h2><span class="icon" style="background:#ede9fe"></span>Patient Details</h2>
+    <table style="font-size:14px">
+      <tbody>
+        <tr>
+          <td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600;width:160px">Full Name</td>
+          <td style="padding:6px 0;font-weight:700;color:#111827">${name}</td>
+        </tr>
+        ${dob ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600">Date of Birth</td><td style="padding:6px 0;font-weight:700;color:#111827">${dob}</td></tr>` : ''}
+        ${diagnosis ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600">Diagnosis</td><td style="padding:6px 0;font-weight:700;color:#111827">${diagnosis}</td></tr>` : ''}
+        ${caregiver ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600">Primary Caregiver</td><td style="padding:6px 0;font-weight:700;color:#111827">${caregiver}</td></tr>` : ''}
+        ${phone ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600">Contact</td><td style="padding:6px 0;font-weight:700;color:#111827">${phone}</td></tr>` : ''}
+        ${notes ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600;vertical-align:top">Care Notes</td><td style="padding:6px 0;color:#374151;line-height:1.6">${notes}</td></tr>` : ''}
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Key Metrics ── -->
+  <section>
+    <h2><span class="icon" style="background:#dbeafe"></span>Key Metrics</h2>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Avg Emotion Score</div>
+        <div class="stat-value">${Math.round(avgScore)}<span style="font-size:16px;font-weight:600;color:#9ca3af">/100</span></div>
+        ${emotionChange !== null ? `<div class="stat-sub">${changeBadge(emotionChange)} vs prev week</div>` : ''}
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Confusion Events</div>
+        <div class="stat-value">${w.confusionCount}</div>
+        ${confusionChange !== null ? `<div class="stat-sub">${changeBadge(confusionChange, true)} vs prev week</div>` : ''}
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Engagement</div>
+        <div class="stat-value">${w.engagementLevel}<span style="font-size:16px;font-weight:600;color:#9ca3af">%</span></div>
+        ${engagementChange !== null ? `<div class="stat-sub">${changeBadge(engagementChange)} vs prev week</div>` : ''}
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Sessions</div>
+        <div class="stat-value">${w.sessionCount}</div>
+        <div class="stat-sub">${w.totalPatientMessages} patient messages</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Activity & Responsiveness ── -->
+  <section>
+    <h2><span class="icon" style="background:#dcfce7"></span>Activity &amp; Responsiveness</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div>
+        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Daily Messages</p>
+        <table style="width:100%"><tbody>${msgRows}</tbody></table>
+      </div>
+      <div style="font-size:14px">
+        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Peak Hours</p>
+        <table><tbody>
+          <tr><td style="padding:5px 12px 5px 0;color:#6b7280;font-weight:600">Most Active</td><td style="font-weight:700;color:#111827">${w.bestHour}</td></tr>
+          <tr><td style="padding:5px 12px 5px 0;color:#6b7280;font-weight:600">Least Active</td><td style="font-weight:700;color:#111827">${w.worstHour}</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Emotion by Day ── -->
+  <section>
+    <h2><span class="icon" style="background:#fce7f3"></span>Emotional Wellbeing by Day</h2>
+    <table style="width:100%"><tbody>${dayRows}</tbody></table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Safety Alerts ── -->
+  <section>
+    <h2><span class="icon" style="background:${w.alertEvents.length > 0 ? '#fee2e2' : '#dcfce7'}"></span>Safety Monitoring</h2>
+    <div class="alert-box ${w.alertEvents.length > 0 ? 'alert-warn' : 'alert-ok'}">
+      <p style="font-weight:800;font-size:14px;margin-bottom:8px;color:${w.alertEvents.length > 0 ? '#dc2626' : '#16a34a'}">
+        ${w.alertEvents.length > 0 ? `⚠ ${w.alertEvents.length} Emergency Alert${w.alertEvents.length !== 1 ? 's' : ''} Detected` : '✓ No Critical Alerts This Week'}
+      </p>
+      <ul style="list-style:none;padding:0;font-size:13px">${alertSection}</ul>
+    </div>
+    ${w.distressCount > 0 ? `<p style="margin-top:10px;font-size:13px;color:#92400e;background:#fef3c7;padding:8px 14px;border-radius:8px">⚠ ${w.distressCount} distress-related message${w.distressCount !== 1 ? 's' : ''} detected during the week. Review session logs for context.</p>` : ''}
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Keywords ── -->
+  ${w.keywords.length > 0 ? `
+  <section>
+    <h2><span class="icon" style="background:#e0f2fe"></span>Common Topics</h2>
+    <div style="margin-top:4px">${keywordBadges}</div>
+  </section>
+  <hr class="divider" />
+  ` : ''}
+
+  <!-- ── AI Insights ── -->
+  <section>
+    <h2><span class="icon" style="background:#ede9fe"></span>AI Caregiver Insights</h2>
+    ${insights ? `
+    <div style="margin-bottom:20px">
+      <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">General Summary</p>
+      ${insightSummary}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div>
+        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Notable Conversations</p>
+        <ul style="font-size:13px;line-height:1.7">${insightConversations}</ul>
+      </div>
+      <div>
+        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Caregiver Recommendations</p>
+        <ul style="list-style:none;padding:0;font-size:13px">${insightRecs}</ul>
+      </div>
+    </div>
+    ` : '<p style="color:#9ca3af;font-size:13px;font-style:italic">AI insights were not available for this week.</p>'}
+  </section>
+
+  <!-- ── Footer ── -->
+  <hr class="divider" />
+  <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.8">
+    <p>This report was auto-generated by the Nura Care platform on ${generated}.</p>
+    <p>It is intended for use by authorised caregivers only. Not a substitute for professional medical advice.</p>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
@@ -844,11 +1182,12 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
         <div className="absolute top-0 right-0 p-8">
           <button
-            onClick={() => window.print()}
-            className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-[var(--nura-dim)] transition-colors"
-            title="Print Report"
+            onClick={() => generateReport({ patient, w, avgScore, insights, emotionChange, confusionChange, engagementChange })}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[var(--nura-dim)] hover:text-[var(--nura-text)] transition-all text-xs font-bold border border-white/10"
+            title="Export Report"
           >
-            <Printer size={20} />
+            <Download size={15} />
+            Export Report
           </button>
         </div>
 

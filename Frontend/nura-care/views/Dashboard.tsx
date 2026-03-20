@@ -157,8 +157,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
         <div className="flex-1 text-center"><h1 className="text-3xl font-extrabold text-[var(--nura-text)] tracking-tight">Your Loved Ones</h1></div>
         <div className="flex items-center gap-3">
-          <button onClick={onLogout} className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-xl transition-all bg-[var(--nura-card)] border border-white/10 group"><LogOut size={20} className="text-[var(--nura-dim)] group-hover:text-red-400" /><span className="text-[var(--nura-text)] font-bold text-sm group-hover:text-red-300">Log Out</span></button>
           <button onClick={() => setShowAccountDeleteModal(true)} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold flex items-center gap-2"><ShieldAlert size={16} /> Delete Account</button>
+          <button onClick={onLogout} className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-xl transition-all bg-[var(--nura-card)] border border-white/10 group"><LogOut size={20} className="text-[var(--nura-dim)] group-hover:text-red-400" /><span className="text-[var(--nura-text)] font-bold text-sm group-hover:text-red-300">Log Out</span></button>
         </div>
       </header>
 
