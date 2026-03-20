@@ -76,5 +76,13 @@
         "patient_ids": [
             "P-1773693249"
         ]
+    },
+    "a@a": {
+        "full_name": "Aftra",
+        "email": "a@a",
+        "password": "a",
+        "patient_ids": [
+            "P-1773693249"
+        ]
     }
 }

@@ -103,7 +103,8 @@
         "authorized_users": [
             "demo@gmail.com",
             "nick@gmail.com",
-            "cher@gmail.com"
+            "cher@gmail.com",
+            "a@a"
         ]
     }
 }

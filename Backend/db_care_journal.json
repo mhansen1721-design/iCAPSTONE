@@ -46,6 +46,15 @@
             "content": "The cleaning service is coming tomorrow at 10:00 AM. I\u2019ll be here to let them in.",
             "type": "update",
             "timestamp": "2026-03-16 16:38:26"
+        },
+        {
+            "entry_id": "J-1773879899-491",
+            "patient_id": "P-1773693249",
+            "author_email": "demo@gmail.com",
+            "author_name": "John",
+            "content": "Had a really good chat with Dad about some of his favourite songs in the 60's. Adding as an approved topic for now will see how it goes!",
+            "type": "update",
+            "timestamp": "2026-03-18 20:24:59"
         }
     ]
 }
