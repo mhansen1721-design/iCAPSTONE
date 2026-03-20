@@ -238,6 +238,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   durationMinutes,
   caregiverEmail,
   caregiverPassword,
+  onBack,
   onLogout,
 }) => {
   if (!patient) return null;

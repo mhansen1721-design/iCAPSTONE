@@ -19,7 +19,7 @@ interface ConfigFlowProps {
 const EmptyPatient: PatientProfile = {
   patient_id: '',
   name: '',
-  avatarType: 'jellyfish',
+  avatarType: 'seal',
   age: 0,
   stage: DementiaStage.EARLY,
   description: '',
@@ -31,7 +31,7 @@ const EmptyPatient: PatientProfile = {
   aiSuggestionsLoaded: false
 };
 
-const AVATAR_OPTIONS: AvatarType[] = ['panda', 'jellyfish', 'axolotl'];
+const AVATAR_OPTIONS: AvatarType[] = ['seal', 'jellyfish', 'bee', 'turtle'];
 
 export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient, onSave, onBack, isEmbedded = false }) => {
   const [formData, setFormData] = useState<PatientProfile>(patient || { ...EmptyPatient });
@@ -52,7 +52,7 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
         ...patient,
         patient_id: p.patient_id || p.id || '',
         name: p.full_name || p.name || '',
-        avatarType: p.avatarType || 'jellyfish', 
+        avatarType: p.avatarType || 'seal', 
         age: p.age || 0,
         stage: p.dementia_stage || p.stage || DementiaStage.EARLY,
         description: p.patient_story || p.description || '',
@@ -170,7 +170,7 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
         {currentStep === 0 && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              {/* Avatar Selection */}
-             <div className="flex justify-center items-end gap-12 w-full max-w-2xl px-8 mx-auto">
+             <div className="flex justify-center items-end gap-6 w-full max-w-2xl px-4 mx-auto flex-wrap">
               {AVATAR_OPTIONS.map((type) => (
                 <button 
                   key={type} 
@@ -178,7 +178,7 @@ export const ConfigFlow: React.FC<ConfigFlowProps> = ({ caregiverEmail, patient,
                   onClick={() => setFormData(p => ({...p, avatarType: type}))} 
                   className={`relative p-6 rounded-[2.5rem] transition-all duration-500 flex flex-col items-center ${formData.avatarType === type ? 'bg-[var(--nura-accent)]/20 scale-110 ring-2 ring-[var(--nura-accent)]' : 'opacity-40 grayscale hover:opacity-100'}`}
                 >
-                  <Avatar size="md" type={type} emotion={formData.avatarType === type ? 'happy' : 'neutral'} />
+                  <Avatar size="md" type={type} emotion={formData.avatarType === type ? 'happy' : 'neutral'} reducedMotion={true} />
                   {formData.avatarType === type && (
                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[var(--nura-accent)] text-white text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg">Selected</div>
                   )}
