@@ -52,14 +52,19 @@ def generate_weekly_insights(
     prompt = f"Analyze this weekly session data and return the insights:\n{json.dumps(analytics_data, indent=2)}"
 
     try:
-        # 4. Call Gemini with Structured Outputs enabled
+        # 4. Call Gemini with STRICTER formatting rules
         response = client.models.generate_content(
-            model='gemini-2.5-flash', # Fast and incredibly smart model
+            model='gemini-2.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
-                system_instruction="You are a clinical diagnostic assistant helping caregivers understand a dementia patient's wellbeing. Summarize the week based on the data.",
+                system_instruction="""You are a clinical diagnostic assistant helping caregivers understand a dementia patient's wellbeing.
+                
+STRICT RULES:
+1. generalSummary: Focus EXCLUSIVELY on conversational themes and the patient's emotional state. DO NOT mention numerical metrics. CRITICAL: If 'alertTriggers' contains ANY items, you MUST explicitly quote the exact trigger phrase (e.g., "want to die") in the summary. Do not be vague; name the exact trigger. NEVER claim there is "no distress" if alerts exist.
+2. notableConversations: Provide a list of short topics or keywords only (2-4 words max per item). If there are alert triggers, you MUST include the EXACT trigger phrase (e.g., "want to die") as one of the tags. Do NOT use generic umbrella terms like "Emergency alert".
+3. caregiverRecommendations: Provide clear, actionable advice. If there are alerts, your first recommendation MUST be to investigate that specific trigger phrase.""",
                 response_mime_type="application/json",
-                response_schema=WeeklyInsights, # <-- This forces perfect JSON!
+                response_schema=WeeklyInsights, 
                 temperature=0.2,
             ),
         )
@@ -72,7 +77,7 @@ def generate_weekly_insights(
         # Smart Fallback
         rec = "Review session transcripts and discuss with the care team immediately." if alert_count > 0 else "Continue current care plan."
         return {
-            "generalSummary": f"{session_count} session(s) completed this week. Average emotion score was {avg_score}/100.",
-            "notableConversations": top_keywords[:2] if top_keywords else [],
+            "generalSummary": "Patient completed their weekly sessions. Review transcripts for specific conversation details and emotional context.",
+            "notableConversations": top_keywords[:3] if top_keywords else ["No specific topics"],
             "caregiverRecommendations": [rec]
         }
