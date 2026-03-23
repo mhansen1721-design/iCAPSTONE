@@ -60,18 +60,6 @@ app.add_middleware(
 # ─────────────────────────────────────────────
 # FILE LAYOUT  (all auto-created on first write)
 # ─────────────────────────────────────────────
-# db_caregivers.json    { email: { full_name, password, patient_ids[] } }
-# db_patients.json      { patient_id: { ...profile, access_code, authorized_users[] } }
-# db_chat_logs.json     { patient_id: { full_name, sessions[{ timestamp, logged_by, transcript[] }] } }
-# db_care_journal.json  { patient_id: [{ entry_id, author_email, author_name, content, type, timestamp }] }
-# db_help_requests.json { patient_id: [{ request_id, title, description,
-#                                        author_email, author_name,
-#                                        claimed_by, claimed_name, status, timestamp }] }
-# db_memory_box.json    { patient_id: [{ photo_id, filename, url, description,
-#                                        uploaded_by_email, uploaded_by_name, timestamp }] }
-#
-# uploads/              Folder where image files are physically stored on disk.
-#                       Served as static files at GET /uploads/{filename}
 CAREGIVERS_FILE    = "db_caregivers.json"
 PATIENTS_FILE      = "db_patients.json"
 CHAT_LOGS_FILE     = "db_chat_logs.json"
@@ -80,16 +68,11 @@ HELP_REQUESTS_FILE = "db_help_requests.json"
 MEMORY_BOX_FILE    = "db_memory_box.json"
 UPLOADS_DIR        = "uploads"
 
-# Create the uploads folder if it doesn't exist yet
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-# Serve the uploads folder as static files so the frontend can load images
-# e.g. GET http://127.0.0.1:8000/uploads/photo_abc123.jpg
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
-# Allowed image extensions (basic safety check)
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"}
-
 
 # ─────────────────────────────────────────────
 # HELPERS
@@ -103,23 +86,18 @@ def load_json(filename: str) -> dict:
         except json.JSONDecodeError:
             return {}
 
-
 def save_json(filename: str, data: dict):
     with open(filename, "w") as f:
         json.dump(data, f, indent=4)
 
-
 def get_timestamp() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 def generate_access_code() -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-
 def short_id(prefix: str) -> str:
     return f"{prefix}-{int(datetime.datetime.now().timestamp())}-{random.randint(100, 999)}"
-
 
 def require_authorized(patient: dict, email: str):
     if email.lower() not in patient.get("authorized_users", []):
@@ -134,11 +112,9 @@ class UserRegistration(BaseModel):
     email: str
     password: str
 
-
 class KeyPerson(BaseModel):
     name: str = ""
     relation: str = ""
-
 
 class PatientProfile(BaseModel):
     patient_id: Optional[str] = None
@@ -152,12 +128,10 @@ class PatientProfile(BaseModel):
     approved_topics: List[str] = []
     known_triggers: List[str] = []
 
-
 class MessageModel(BaseModel):
     sender: str
     text: str
     timestamp: str
-
 
 class SessionSave(BaseModel):
     email: str
@@ -165,20 +139,17 @@ class SessionSave(BaseModel):
     patient_id: str
     full_name: str
     messages: List[MessageModel]
-    end_reason: str = "completed"   # "completed" = timer ended | "early" = End Session button
-
+    end_reason: str = "completed"
 
 class JoinCircleRequest(BaseModel):
     email: str
     access_code: str
 
-
 class JournalEntryCreate(BaseModel):
     patient_id: str
     author_email: str
     content: str
-    type: str = "update"   # update | medication | problem | milestone
-
+    type: str = "update"
 
 class HelpRequestCreate(BaseModel):
     patient_id: str
@@ -186,16 +157,26 @@ class HelpRequestCreate(BaseModel):
     title: str
     description: str = ""
 
-
 class ClaimRequest(BaseModel):
     claimer_email: str
-
 
 class ChatRequest(BaseModel):
     patient_id: str
     user_input: str
-    chat_history: list = []          # [{"role": "user"|"assistant", "content": str}, …]
-    detected_tier: Optional[int] = None  # 1 | 2 | 3 — client-detected; auto-detected if omitted
+    chat_history: list = []
+    detected_tier: Optional[int] = None
+
+# NEW: Data model for the Analytics Dashboard Request
+class AnalyticsRequest(BaseModel):
+    patientName: str
+    weekRange: str
+    sessionCount: int
+    totalMessages: int
+    avgScore: int
+    confusionCount: int
+    distressCount: int
+    alertCount: int
+    topKeywords: List[str]
 
 
 # ─────────────────────────────────────────────
@@ -215,7 +196,6 @@ def register(data: UserRegistration):
     }
     save_json(CAREGIVERS_FILE, caregivers)
     return {"success": True}
-
 
 @app.post("/login")
 def login(email: str, password: str):
@@ -242,12 +222,9 @@ def get_caregiver_patients(email: str):
     patients = [patients_db[pid] for pid in patient_ids if pid in patients_db]
     return {"exists": len(patients) > 0, "patients": patients}
 
-
-# Backward-compatible alias
 @app.get("/caregiver/init-profile/{email}")
 def init_companion_profile_legacy(email: str):
     return get_caregiver_patients(email)
-
 
 @app.post("/patients/save/{email}")
 def save_or_update_patient(email: str, data: PatientProfile):
@@ -282,7 +259,6 @@ def save_or_update_patient(email: str, data: PatientProfile):
         save_json(CHAT_LOGS_FILE, logs)
 
     return {"success": True, "patient_id": final_id, "access_code": patient_dict["access_code"]}
-
 
 @app.delete("/patients/delete/{email}/{patient_id}")
 def delete_patient_profile(email: str, patient_id: str):
@@ -341,7 +317,6 @@ def join_care_circle(data: JoinCircleRequest):
         save_json(CAREGIVERS_FILE, caregivers)
 
     return {"success": True, "patient_name": target_patient.get("full_name"), "patient_id": target_id}
-
 
 @app.post("/patients/activate-circle/{patient_id}")
 def activate_care_circle(patient_id: str):
@@ -402,7 +377,6 @@ def get_journal(patient_id: str, email: str):
     journal_db = load_json(JOURNAL_FILE)
     return sorted(journal_db.get(patient_id, []), key=lambda x: x.get("timestamp", ""), reverse=True)
 
-
 @app.post("/api/journal")
 def add_journal_entry(data: JournalEntryCreate):
     patients_db   = load_json(PATIENTS_FILE)
@@ -445,7 +419,6 @@ def get_help_requests(patient_id: str, email: str):
     requests_db = load_json(HELP_REQUESTS_FILE)
     return sorted(requests_db.get(patient_id, []), key=lambda x: x.get("timestamp", ""), reverse=True)
 
-
 @app.post("/api/help-requests")
 def create_help_request(data: HelpRequestCreate):
     patients_db   = load_json(PATIENTS_FILE)
@@ -476,7 +449,6 @@ def create_help_request(data: HelpRequestCreate):
     requests_db[data.patient_id].append(request)
     save_json(HELP_REQUESTS_FILE, requests_db)
     return request
-
 
 @app.post("/api/help-requests/{request_id}/claim")
 def claim_help_request(request_id: str, data: ClaimRequest):
@@ -513,7 +485,6 @@ def claim_help_request(request_id: str, data: ClaimRequest):
     save_json(HELP_REQUESTS_FILE, requests_db)
     return req
 
-
 @app.post("/api/help-requests/{request_id}/complete")
 def complete_help_request(request_id: str, data: ClaimRequest):
     patients_db = load_json(PATIENTS_FILE)
@@ -536,7 +507,6 @@ def complete_help_request(request_id: str, data: ClaimRequest):
 # ─────────────────────────────────────────────
 @app.get("/api/memory-box/{patient_id}")
 def get_memory_box(patient_id: str, email: str):
-    """Returns all photos in this patient's memory box."""
     patients_db = load_json(PATIENTS_FILE)
     patient = patients_db.get(patient_id)
     if not patient:
@@ -545,7 +515,6 @@ def get_memory_box(patient_id: str, email: str):
     memory_db = load_json(MEMORY_BOX_FILE)
     return sorted(memory_db.get(patient_id, []), key=lambda x: x.get("timestamp", ""), reverse=True)
 
-
 @app.post("/api/memory-box/upload")
 async def upload_photo(
     patient_id: str  = Form(...),
@@ -553,12 +522,6 @@ async def upload_photo(
     description: str  = Form(""),
     file: UploadFile  = File(...)
 ):
-    """
-    Accepts a multipart form upload. Saves the image to disk under uploads/,
-    then records the metadata in db_memory_box.json so all caregivers can see it.
-
-    The frontend reads the photo back from: GET /uploads/{filename}
-    """
     patients_db   = load_json(PATIENTS_FILE)
     caregivers_db = load_json(CAREGIVERS_FILE)
     memory_db     = load_json(MEMORY_BOX_FILE)
@@ -568,7 +531,6 @@ async def upload_photo(
         raise HTTPException(status_code=404, detail="Patient not found.")
     require_authorized(patient, author_email)
 
-    # Validate extension
     _, ext = os.path.splitext(file.filename or "")
     ext = ext.lower()
     if ext not in ALLOWED_EXTENSIONS:
@@ -577,22 +539,18 @@ async def upload_photo(
             detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
-    # Build a unique filename so nothing ever gets overwritten
     photo_id = short_id("IMG")
     safe_filename = f"{photo_id}{ext}"
     file_path = os.path.join(UPLOADS_DIR, safe_filename)
 
-    # Write the file to disk
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Record metadata
     author = caregivers_db.get(author_email.lower(), {})
     photo = {
         "photo_id":           photo_id,
         "patient_id":         patient_id,
         "filename":           safe_filename,
-        # URL the frontend uses to display the image
         "url":                f"http://127.0.0.1:8000/uploads/{safe_filename}",
         "description":        description.strip(),
         "uploaded_by_email":  author_email.lower(),
@@ -607,17 +565,11 @@ async def upload_photo(
 
     return photo
 
-
 @app.delete("/api/memory-box/{photo_id}")
 def delete_photo(photo_id: str, email: str):
-    """
-    Deletes the image file from disk and removes the metadata record.
-    Only an authorized caregiver can delete.
-    """
     patients_db = load_json(PATIENTS_FILE)
     memory_db   = load_json(MEMORY_BOX_FILE)
 
-    # Find the photo across all patient buckets
     target_pid = None
     target_idx = None
     target_photo = None
@@ -636,12 +588,10 @@ def delete_photo(photo_id: str, email: str):
 
     require_authorized(patients_db.get(target_pid, {}), email)
 
-    # Delete the actual file from disk
     file_path = os.path.join(UPLOADS_DIR, target_photo["filename"])
     if os.path.exists(file_path):
         os.remove(file_path)
 
-    # Remove metadata record
     memory_db[target_pid].pop(target_idx)
     if not memory_db[target_pid]:
         del memory_db[target_pid]
@@ -651,46 +601,26 @@ def delete_photo(photo_id: str, email: str):
 
 
 # ─────────────────────────────────────────────
-# 8. SESSION LOGGING
+# 8. SESSION LOGGING & AI ANALYTICS
 # ─────────────────────────────────────────────
-
-# ── LLM Chat Response ──────────────────────────────────────────────────────────
 @app.post("/chat/respond")
 async def chat_respond(data: ChatRequest):
-    """
-    Receives a patient message + conversation history and returns an LLM-generated
-    companion response via Qwen2.5-3B-Instruct (llm_chat.py).
-
-    Response shape:
-    {
-        "response_text": str,          # AI's spoken reply
-        "ui_signal":     str,          # "NONE" | "REDIRECT" | "ALERT"
-        "log_entry":     str           # Clinical tag for caregiver logs
-    }
-
-    ui_signal == "ALERT" means a Tier-3 emergency was detected — the frontend
-    should surface a prominent caregiver notification immediately.
-    """
     patients_db = load_json(PATIENTS_FILE)
     memory_db   = load_json(MEMORY_BOX_FILE)
     patient     = patients_db.get(data.patient_id, {})
 
-    # Build memory photos list — include photo_id, description, and keyword tags
-    # Keywords come from the description text itself (caregivers write descriptive captions)
     raw_photos = memory_db.get(data.patient_id, [])
     memory_photos = [
         {
             "photo_id":    p.get("photo_id", ""),
             "url":         p.get("url", ""),
             "description": p.get("description", ""),
-            # Use description words as keywords so the LLM can match them naturally
             "keywords":    p.get("description", ""),
         }
         for p in raw_photos
         if p.get("photo_id") and p.get("url")
     ]
 
-    # Build the patient_info dict that llm_chat.py expects
     patient_info = {
         "name":             patient.get("full_name", ""),
         "companion_figure": "your AI companion Nura",
@@ -706,7 +636,6 @@ async def chat_respond(data: ChatRequest):
         "user_input":    data.user_input,
         "patient_info":  patient_info,
         "chat_history":  data.chat_history,
-        # Use client-supplied tier when present; llm_chat auto-detects if None
         **({"detected_tier": data.detected_tier} if data.detected_tier is not None else {}),
     }
 
@@ -715,7 +644,6 @@ async def chat_respond(data: ChatRequest):
         result = generate_response(payload)
         return result
     except Exception as exc:
-        # Never crash the session — use the smart template fallback
         try:
             from llm_chat import _template_fallback, detect_tier
             tier = detect_tier(data.user_input, data.chat_history)
@@ -747,7 +675,7 @@ def save_session(data: SessionSave):
     logs_db[data.patient_id]["sessions"].append({
         "timestamp":  get_timestamp(),
         "logged_by":  email_key,
-        "end_reason": data.end_reason,   # "completed" or "early"
+        "end_reason": data.end_reason,
         "transcript": [msg.model_dump() for msg in data.messages],
     })
     save_json(CHAT_LOGS_FILE, logs_db)
@@ -759,8 +687,40 @@ def get_all_chat_logs():
     return load_json(CHAT_LOGS_FILE)
 
 
+# NEW: AI Analytics Insights Endpoint
+@app.post("/api/analytics/insights")
+def get_analytics_insights(data: AnalyticsRequest):
+    try:
+        # Import the function from your new llm_analytics.py file
+        from llm_analytics import generate_weekly_insights
+        
+        # This already returns a clean, fully-parsed Python dictionary!
+        insights_dict = generate_weekly_insights(
+            patient_name=data.patientName,
+            week_range=data.weekRange,
+            session_count=data.sessionCount,
+            total_messages=data.totalMessages,
+            avg_score=data.avgScore,
+            confusion_count=data.confusionCount,
+            distress_count=data.distressCount,
+            alert_count=data.alertCount,
+            top_keywords=data.topKeywords
+        )
+        
+        # Return it directly! FastAPI will automatically send it as JSON to React.
+        return insights_dict
+
+    except Exception as e:
+        logger.error(f"Error generating AI Insights: {e}")
+        # Safe fallback if AI generation fails
+        return {
+            "generalSummary": f"AI insights currently unavailable due to server constraints. A total of {data.sessionCount} sessions were completed.",
+            "notableConversations": [],
+            "caregiverRecommendations": ["Please review the chat logs manually for this week."]
+        }
+
 # ─────────────────────────────────────────────
-# 9. ACCOUNT MANAGEMENT
+# 9. ACCOUNT MANAGEMENT & LLM STATUS
 # ─────────────────────────────────────────────
 @app.post("/caregiver/delete-account")
 def delete_caregiver_account(data: dict):
@@ -788,11 +748,6 @@ def delete_caregiver_account(data: dict):
 
 @app.get("/llm/warmup")
 def llm_warmup():
-    """
-    Triggers background model loading without blocking.
-    Call this when the user enters the chat screen.
-    Returns immediately — poll /llm/status to check progress.
-    """
     if _llm_load_error:
         return {"status": "error", "detail": _llm_load_error}
     try:
@@ -804,15 +759,8 @@ def llm_warmup():
     threading.Thread(target=_load_llm_background, daemon=True).start()
     return {"status": "loading"}
 
-
 @app.get("/llm/status")
 def llm_status():
-    """
-    Returns the current state of the Qwen model pipeline.
-      loading  – model is not yet loaded (warmup not called, or still in progress)
-      ready    – model is loaded and ready
-      error    – model failed to load (check server logs)
-    """
     if _llm_load_error:
         return {"status": "error", "detail": _llm_load_error}
     try:
@@ -820,4 +768,3 @@ def llm_status():
         return {"status": "ready" if llm_chat._pipeline is not None else "loading"}
     except Exception as exc:
         return {"status": "error", "detail": str(exc)}
-    
