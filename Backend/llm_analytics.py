@@ -54,7 +54,7 @@ def generate_weekly_insights(
     try:
         # 4. Call Gemini with STRICTER formatting rules
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction="""You are a clinical diagnostic assistant helping caregivers understand a dementia patient's wellbeing.

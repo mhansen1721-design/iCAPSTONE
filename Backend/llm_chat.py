@@ -24,36 +24,38 @@ import re
 import logging
 import datetime
 import random
+import os
+import google.generativeai as genai
 from typing import Any
 
 logger = logging.getLogger("nura.llm")
 
-# ── Singleton pipeline ────────────────────────────────────────────────────────
 _pipeline: Any = None
 
-
 def get_pipeline():
+    """兼容旧代码的预热调用，实际返回 Gemini 模型"""
     global _pipeline
-    if _pipeline is None:
-        import platform
-        import torch
-        from transformers import pipeline
-
-        on_mac = platform.system() == "Darwin"
-        if on_mac:
-            device_kwargs = {"device": "cpu", "torch_dtype": torch.float32}
-            logger.info("[LLM] macOS — CPU + float32")
-        else:
-            device_kwargs = {"device_map": "auto", "torch_dtype": torch.float16}
-            logger.info("[LLM] Non-Mac — device_map=auto + float16")
-
-        _pipeline = pipeline(
-            "text-generation",
-            model="Qwen/Qwen2.5-0.5B-Instruct",
-            **device_kwargs,
-        )
-        logger.info("[LLM] Model ready.")
+    _pipeline = get_gemini_model()
     return _pipeline
+
+# ── Singleton pipeline (现为 Gemini) ──────────────────────────────────────────
+_gemini_model: Any = None
+
+
+def get_gemini_model():
+    global _gemini_model
+    if _gemini_model is None:
+        api_key = "AIzaSyCQibcYJwI_KxzoA0RIJ3y3T94Mv7sTvbI"
+        if not api_key:
+            logger.error("[LLM] 未找到 GEMINI_API_KEY 环境变量。")
+            raise ValueError("需要配置 GEMINI_API_KEY 环境变量")
+            
+        genai.configure(api_key=api_key)
+        
+        # 实例化 Gemini 模型
+        _gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+        logger.info("[LLM] Gemini API 就绪。")
+    return _gemini_model
 
 
 # ── Tier detection ────────────────────────────────────────────────────────────
@@ -150,8 +152,6 @@ def _is_good_llm_response(text: str) -> bool:
 
 
 # ── Factual knowledge base ────────────────────────────────────────────────────
-# Keyed by topic keyword. Each entry is (direct_answer, follow_up_question).
-# The template uses these to give real answers before inviting conversation.
 _FACTS: dict[str, list[tuple[str, str]]] = {
     # Gardening
     "tomato": [
@@ -372,7 +372,10 @@ def _template_response(user_input: str, patient_info: dict, tier: int) -> dict:
 
 
 # ── LLM prompt ────────────────────────────────────────────────────────────────
-def _build_prompt(patient_info: dict, tier: int, user_input: str, history_block: str) -> list[dict]:
+def _build_prompt(patient_info: dict, tier: int, user_input: str, history_block: str) -> str:
+    """
+    修改为直接返回拼接好的字符串格式，供 Gemini API 使用。
+    """
     name       = patient_info.get("name") or "friend"
     companion  = patient_info.get("companion_figure") or "Nura"
     story      = patient_info.get("patient_story") or "Not provided."
@@ -405,10 +408,9 @@ RULES (every response must follow all):
 7. At most one question per response. Often zero.
 8. Do not echo back what they said. Just respond.
 9. If they ask the year, it is {year}.
-10. Your ONLY job is to ask {name} about their own life.
-11. If {name} mentions a topic (like family), ask: "That's lovely. What is your favorite memory of them?" or "Tell me a story about them."
-12. MEMORY MINING: Every question must ask about {name}'s past (e.g., "Who was with you?", "What did that smell like?", "How did that make you feel?").
-13. BE BRAVE: If {name} is quiet or says something short, use the 'Safe Topics' below to start a new memory question.
+10. CRITICAL MEMORY MINING: EVERY SINGLE RESPONSE MUST end with a question that asks {name} to share a life story, a specific memory, or discuss one of their Safe Topics.
+11. NO GENERIC QUESTIONS: Never ask "How are you?" or "What do you want to talk about?". Instead ask: "What was your favorite memory of [Safe Topic]?" or "Tell me a story about [Key Person]."
+12. TRIGGER AVOIDANCE: If {name} brings up any dangerous topics, distress, or anything from the 'Avoid' list, you MUST change the subject with patience. Validate their feelings briefly ("I understand," "I'm right here"), then IMMEDIATELY pivot to asking a story about a 'Safe Topic'. Do not dwell on the negative topic.
 
 Background: {story}
 Key people: {people}
@@ -425,10 +427,7 @@ OUTPUT: valid JSON only — no markdown, no extra text.
         if history_block else
         f"{name}: \"{user_input}\"\n\nNura (JSON only):"
     )
-    return [
-        {"role": "system", "content": system},
-        {"role": "user",   "content": user_msg},
-    ]
+    return f"{system}\n\n{user_msg}"
 
 
 # ── Response parser ───────────────────────────────────────────────────────────
@@ -480,7 +479,7 @@ def generate_response(payload: dict) -> dict:
     # Step 1: guaranteed template response
     result = _template_response(user_input, patient_info, tier)
 
-    # Step 2: attempt LLM upgrade
+    # Step 2: attempt LLM upgrade via Gemini
     try:
         name = patient_info.get("name") or "friend"
         history_lines = []
@@ -491,40 +490,46 @@ def generate_response(payload: dict) -> dict:
                 history_lines.append(f"{role}: {content}")
         history_block = "\n".join(history_lines)
 
-        messages   = _build_prompt(patient_info, tier, user_input, history_block)
-        generator  = get_pipeline()
+        # 1. 获取拼接好的 Prompt 字符串
+        full_prompt = _build_prompt(patient_info, tier, user_input, history_block)
+        
+        # 2. 获取 Gemini 模型实例
+        model = get_gemini_model()
 
-        from transformers import GenerationConfig
-        gen_config = GenerationConfig(
-            max_new_tokens=80,
-            do_sample=True,
+        # 3. 设定生成配置：强制输出 JSON 格式
+        generation_config = genai.types.GenerationConfig(
+            max_output_tokens=80,
             temperature=0.3,
-            repetition_penalty=1.3,
+            response_mime_type="application/json", 
         )
 
-        output = generator(messages, generation_config=gen_config, return_full_text=False)
-        raw = output[0]["generated_text"]
-        if isinstance(raw, list):
-            raw = raw[-1].get("content", "") if raw else ""
+        # 4. 调用 Gemini API
+        response = model.generate_content(
+            full_prompt,
+            generation_config=generation_config
+        )
+        
+        raw = response.text
 
+        # 5. 解析并验证响应
         parsed = _parse(raw)
         if parsed:
             llm_text = parsed.get("response_text", "")
             if _is_good_llm_response(llm_text):
-                # LLM passed — use it
-                logger.info("[LLM] Using LLM response: %r", llm_text[:80])
+                # LLM 验证通过 — 使用它
+                logger.info("[LLM] Using Gemini response: %r", llm_text[:80])
                 return {
                     "response_text": llm_text,
                     "ui_signal":     parsed.get("ui_signal", "NONE"),
-                    "log_entry":     parsed.get("log_entry", "LLM response"),
+                    "log_entry":     parsed.get("log_entry", "Gemini response"),
                 }
             else:
-                logger.info("[LLM] LLM output rejected — keeping template.")
+                logger.info("[LLM] Gemini output rejected — keeping template.")
 
     except Exception as exc:
-        logger.warning("[LLM] Generation failed (%s) — keeping template.", exc)
+        logger.warning("[LLM] Gemini Generation failed (%s) — keeping template.", exc)
 
-    # Step 3: return template
+    # Step 3: return template (fallback)
     return result
 
 

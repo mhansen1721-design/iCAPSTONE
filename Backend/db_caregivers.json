@@ -21,7 +21,9 @@
         "full_name": "testing",
         "email": "b@b",
         "password": "b",
-        "patient_ids": []
+        "patient_ids": [
+            "P-1774557215"
+        ]
     },
     "mmhansen@uwaterloo.ca": {
         "full_name": "Testing",

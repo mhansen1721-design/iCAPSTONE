@@ -106,5 +106,34 @@
             "cher@gmail.com",
             "a@a"
         ]
+    },
+    "P-1774557215": {
+        "patient_id": "P-1774557215",
+        "full_name": "Elizabeth",
+        "age": 78,
+        "dementia_stage": "Early Stage (Mild)",
+        "patient_story": "",
+        "hobbies_and_career": "",
+        "avatarType": "jellyfish",
+        "key_people": [
+            {
+                "name": "Bob",
+                "relation": "son"
+            }
+        ],
+        "approved_topics": [
+            "food",
+            "dancing",
+            "music"
+        ],
+        "known_triggers": [
+            "waterloo",
+            "job",
+            "school"
+        ],
+        "access_code": "TPISTE",
+        "authorized_users": [
+            "b@b"
+        ]
     }
 }

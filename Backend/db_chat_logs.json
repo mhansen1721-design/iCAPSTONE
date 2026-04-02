@@ -450,5 +450,259 @@
                 "transcript": []
             }
         ]
+    },
+    "P-1774557215": {
+        "full_name": "Elizabeth",
+        "sessions": [
+            {
+                "timestamp": "2026-03-26 16:37:54",
+                "logged_by": "b@b",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "waterloo",
+                        "timestamp": "2026-03-26T20:33:49.657Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I love our conversations, test. Would you like to talk about 2?",
+                        "timestamp": "2026-03-26T20:33:49.700Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "i want to die",
+                        "timestamp": "2026-03-26T20:37:05.953Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Please stay still and stay calm \u2014 I'm alerting someone to help you right now. You are not alone and help is on the way.",
+                        "timestamp": "2026-03-26T20:37:05.978Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "I'm not feeling today",
+                        "timestamp": "2026-03-26T20:37:38.325Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Understood. Let\u2019s continue from where we left off.",
+                        "timestamp": "2026-03-26T20:37:42.740Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "I'm not feeling well today",
+                        "timestamp": "2026-03-26T20:37:48.570Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Understood.",
+                        "timestamp": "2026-03-26T20:37:51.489Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-26 16:38:39",
+                "logged_by": "b@b",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Good morning",
+                        "timestamp": "2026-03-26T20:38:32.056Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "That's really interesting, test. Would you like to talk about 3?",
+                        "timestamp": "2026-03-26T20:38:33.994Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-03-26 16:40:30",
+                "logged_by": "b@b",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Good morning",
+                        "timestamp": "2026-03-26T20:39:38.965Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Tell me more about that, Elizabeth. Would you like to talk about music?",
+                        "timestamp": "2026-03-26T20:39:40.941Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "Sure, i love playing piano",
+                        "timestamp": "2026-03-26T20:39:54.543Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I'm glad we could chat today! How do you find your day so far?",
+                        "timestamp": "2026-03-26T20:40:02.275Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-04-02 12:55:59",
+                "logged_by": "b@b",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Let's talk about food",
+                        "timestamp": "2026-04-02T16:54:33.951Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Tell me about your experience with food, Elizabeth.",
+                        "timestamp": "2026-04-02T16:54:34.238Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "i love tomato sauce pastas",
+                        "timestamp": "2026-04-02T16:54:54.536Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Tomatoes love full sun and warm soil \u2014 plant them deep with just the top leaves showing and water regularly at the base. Do you have a favourite spot in the garden for them?",
+                        "timestamp": "2026-04-02T16:54:54.629Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "i have! i always try to plant them",
+                        "timestamp": "2026-04-02T16:55:18.086Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Most plants are happiest with good light and regular watering \u2014 not too much, not too little. The soil should feel just slightly damp. Do you have a favourite plant?",
+                        "timestamp": "2026-04-02T16:55:18.207Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "I have",
+                        "timestamp": "2026-04-02T16:55:26.100Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I love our conversations, Elizabeth. Would you like to talk about food?",
+                        "timestamp": "2026-04-02T16:55:26.231Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "let's talk about music",
+                        "timestamp": "2026-04-02T16:55:37.550Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Music has such a powerful way of bringing memories back. A song can take you right back to a moment in time. What kind of music have you always loved?",
+                        "timestamp": "2026-04-02T16:55:37.634Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "along with dancing",
+                        "timestamp": "2026-04-02T16:55:55.417Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I love our conversations, Elizabeth. Would you like to talk about dancing?",
+                        "timestamp": "2026-04-02T16:55:55.499Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-04-02 13:10:45",
+                "logged_by": "b@b",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "let's talk about music",
+                        "timestamp": "2026-04-02T17:10:33.635Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Music has such a powerful way of bringing memories back. A song can take you right back to a moment in time. What kind of music have you always loved?",
+                        "timestamp": "2026-04-02T17:10:34.079Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "I've always loved classical music",
+                        "timestamp": "2026-04-02T17:10:41.402Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Music has such a powerful way of bringing memories back. A song can take you right back to a moment in time. What kind of music have you always loved?",
+                        "timestamp": "2026-04-02T17:10:41.521Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-04-02 13:13:20",
+                "logged_by": "b@b",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "Let's talk about food",
+                        "timestamp": "2026-04-02T17:13:11.186Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Tell me about your experience with food, Elizabeth.",
+                        "timestamp": "2026-04-02T17:13:11.485Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "i want to die",
+                        "timestamp": "2026-04-02T17:13:16.979Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "Please stay still and stay calm \u2014 I'm alerting someone to help you right now. You are not alone and help is on the way.",
+                        "timestamp": "2026-04-02T17:13:16.997Z"
+                    }
+                ]
+            },
+            {
+                "timestamp": "2026-04-02 13:22:57",
+                "logged_by": "b@b",
+                "end_reason": "early",
+                "transcript": [
+                    {
+                        "sender": "patient",
+                        "text": "food",
+                        "timestamp": "2026-04-02T17:16:40.808Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I love our conversations, Elizabeth. Would you like to talk about music?",
+                        "timestamp": "2026-04-02T17:16:40.941Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "sure",
+                        "timestamp": "2026-04-02T17:16:45.638Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "That's really interesting, Elizabeth. Would you like to talk about dancing?",
+                        "timestamp": "2026-04-02T17:16:45.806Z"
+                    },
+                    {
+                        "sender": "patient",
+                        "text": "im sad",
+                        "timestamp": "2026-04-02T17:21:59.641Z"
+                    },
+                    {
+                        "sender": "ai",
+                        "text": "I love our conversations, Elizabeth. Would you like to talk about dancing?",
+                        "timestamp": "2026-04-02T17:22:00.385Z"
+                    }
+                ]
+            }
+        ]
     }
 }
