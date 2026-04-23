@@ -11,7 +11,6 @@ import {
   XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
-import { GoogleGenAI, Type } from '@google/genai';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface AnalyticsDashboardProps {
@@ -47,8 +46,8 @@ interface WeekData {
   sessionCount: number;
   totalPatientMessages: number;
   emotionByDay: DayEmotion[];
-  engagementLevel: number;          // 0–100
-  dailyMessageCounts: number[];     // [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+  engagementLevel: number;
+  dailyMessageCounts: number[];
   keywords: KeywordItem[];
   confusionCount: number;
   distressCount: number;
@@ -86,31 +85,25 @@ const POSITIVE_KW = [
 
 // ─── Stop words for keyword extraction ───────────────────────────────────────
 const STOP = new Set([
-  // Pronouns
   "i","me","my","myself","we","our","ours","ourselves","you","your","yours",
   "yourself","he","him","his","himself","she","her","hers","herself",
   "it","its","itself","they","them","their","theirs","themselves",
-  // Demonstratives / articles
   "this","that","these","those","a","an","the",
-  // To be / auxiliaries
   "is","are","was","were","be","been","being","am",
   "have","has","had","having","do","does","did","doing",
   "will","would","could","should","may","might","can","shall","must",
-  // Prepositions / conjunctions
   "to","of","in","for","on","with","at","by","from","as","into",
   "through","about","before","after","between","against","during",
   "without","within","along","following","across","behind","beyond",
   "and","but","or","nor","so","yet","both","either","neither","if",
   "then","than","though","although","because","since","while","when",
   "where","which","who","whom","whose","what","how","whether","until",
-  // Common adverbs / fillers
   "not","no","nor","up","out","too","very","really","also","just",
   "still","here","there","now","then","already","always","never",
   "sometimes","often","again","almost","even","ever","quite","rather",
   "soon","yet","today","tomorrow","yesterday","back","away","around",
   "maybe","perhaps","probably","actually","certainly","definitely",
   "usually","generally","basically","literally","totally","anyway",
-  // Common verbs that add no topic signal
   "go","goes","going","went","gone","get","gets","getting","got",
   "come","comes","coming","came","make","makes","making","made",
   "let","lets","know","knows","knowing","knew","think","thinks",
@@ -123,17 +116,14 @@ const STOP = new Set([
   "keep","kept","give","gave","find","found","show","showed","start",
   "help","hope","mean","work","works","working","worked","play",
   "like","love","care","wish","wonder","happen","happens","happened",
-  // Contractions (after apostrophe stripping)
   "im","ive","id","ill","its","isnt","arent","wasnt","werent",
   "dont","doesnt","didnt","wont","wouldnt","couldnt","shouldnt",
   "cant","cannot","lets","thats","whats","whos","theres","heres",
   "theyre","youre","were","hed","shed","theyd","wed","youd",
-  // Greetings / conversation openers
   "hi","hey","hello","oh","ah","um","uh","hmm","hm","wow","ok",
   "okay","yes","yeah","yep","nope","nah","sure","right","well",
   "so","now","nice","good","great","fine","okay","thanks","thank",
   "please","sorry","excuse","pardon",
-  // Quantity / misc
   "one","two","three","four","five","more","much","many","few",
   "less","most","some","any","all","every","each","other","another",
   "same","different","thing","things","something","anything","nothing",
@@ -211,17 +201,10 @@ function computeWeekData(
   weekBounds: ReturnType<typeof getWeekBounds>,
   globalMaxMessages: number
 ): WeekData {
-  // Emotion by day
   const dayScores: number[][] = Array.from({length:7}, () => []);
   const dayHasData = Array(7).fill(false);
-
-  // Daily message counts
   const dailyCounts = Array(7).fill(0);
-
-  // Keyword frequency
   const wordFreq: Record<string, number> = {};
-
-  // Hour bucket for responsiveness
   const hourMsgCount: Record<number, number> = {};
 
   let confusionCount = 0;
@@ -246,7 +229,6 @@ function computeWeekData(
 
       const l = msg.text.toLowerCase();
 
-      // Tier tracking
       if (TIER3_KW.some(kw => l.includes(kw))) {
         const trigger = TIER3_KW.find(kw => l.includes(kw)) || 'unknown';
         if (!alertEvents.find(e => e.sessionId === session.id)) {
@@ -256,10 +238,9 @@ function computeWeekData(
       if (TIER2_KW.some(kw => l.includes(kw))) distressCount++;
       if (['confused','lost','forgot','don\'t know','don\'t remember','where am i'].some(kw => l.includes(kw))) confusionCount++;
 
-      // Keyword extraction — strip ALL apostrophes so "let's"→"lets" etc. hit STOP
       const words = msg.text.toLowerCase().replace(/[^a-z\s']/g, '').split(/\s+/);
       for (const w of words) {
-        const clean = w.replace(/'/g, '');   // strip all apostrophes (internal + edge)
+        const clean = w.replace(/'/g, '');   
         if (clean.length > 3 && !STOP.has(clean)) {
           wordFreq[clean] = (wordFreq[clean] || 0) + 1;
         }
@@ -269,26 +250,14 @@ function computeWeekData(
     }
   }
 
-  // Emotion by day
   const emotionByDay: DayEmotion[] = DAY_LABELS.map((day, i) => {
     const scores = dayScores[i];
-    const avg = scores.length > 0
-      ? Math.round(scores.reduce((a,b) => a+b, 0) / scores.length)
-      : 60;
-    return {
-      day,
-      score: avg,
-      hasData: dayHasData[i],
-      ...scoreToEmotion(avg),
-    };
+    const avg = scores.length > 0 ? Math.round(scores.reduce((a,b) => a+b, 0) / scores.length) : 60;
+    return { day, score: avg, hasData: dayHasData[i], ...scoreToEmotion(avg) };
   });
 
-  // Engagement level
-  const engagementLevel = globalMaxMessages > 0
-    ? Math.min(100, Math.round((totalPatientMessages / globalMaxMessages) * 100))
-    : 0;
+  const engagementLevel = globalMaxMessages > 0 ? Math.min(100, Math.round((totalPatientMessages / globalMaxMessages) * 100)) : 0;
 
-  // Keywords — top 12 by frequency
   const keywords: KeywordItem[] = Object.entries(wordFreq)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12)
@@ -298,86 +267,20 @@ function computeWeekData(
       color: KEYWORD_COLORS[i % KEYWORD_COLORS.length],
     }));
 
-  // Best / worst hour
   const hourEntries = Object.entries(hourMsgCount).map(([h, c]) => ({ h: Number(h), c }));
   hourEntries.sort((a, b) => b.c - a.c);
   const bestHour  = hourEntries.length > 0 ? formatHour(hourEntries[0]?.h)  : 'Not enough data';
   const worstHour = hourEntries.length > 1 ? formatHour(hourEntries[hourEntries.length - 1].h) : 'Not enough data';
 
-  return {
-    weekKey: weekBounds.key,
-    range: weekBounds.label,
-    sessionCount: sessions.length,
-    totalPatientMessages,
-    emotionByDay,
-    engagementLevel,
-    dailyMessageCounts: dailyCounts,
-    keywords,
-    confusionCount,
-    distressCount,
-    alertEvents,
-    bestHour,
-    worstHour,
-  };
-}
-
-// ─── LLM insights prompt ─────────────────────────────────────────────────────
-function buildInsightsPrompt(patientName: string, w: WeekData): string {
-  const avgScore = w.emotionByDay.filter(d => d.hasData).reduce((s,d) => s+d.score, 0)
-    / (w.emotionByDay.filter(d => d.hasData).length || 1);
-  const topKeywords = w.keywords.slice(0, 5).map(k => k.text).join(', ') || 'none recorded';
-  return `You are a clinical AI assistant helping caregivers understand a dementia patient's wellbeing.
-
-Patient: ${patientName}
-Week: ${w.range}
-
-Session Data Summary:
-- Sessions: ${w.sessionCount}
-- Total patient messages: ${w.totalPatientMessages}
-- Average emotion score: ${Math.round(avgScore)}/100
-- Confusion events: ${w.confusionCount}
-- Distress events: ${w.distressCount}
-- Emergency alerts: ${w.alertEvents.length}
-- Top topics mentioned: ${topKeywords}
-- Most responsive time: ${w.bestHour}
-- Least responsive time: ${w.worstHour}
-
-Write a concise weekly care summary based ONLY on this data.
-Include:
-1. A general summary of the patient's week (combining mood, behavior, and overall conversation flow).
-2. Notable conversations or topics.
-3. Caregiver recommendations (actionable advice for the caregiver based on the week's data).
-
-Respond ONLY with valid JSON (no markdown, no extra text) matching this schema:
-{
-  "generalSummary": "string",
-  "notableConversations": ["string", "string"],
-  "caregiverRecommendations": ["string", "string"]
-}`;
+  return { weekKey: weekBounds.key, range: weekBounds.label, sessionCount: sessions.length, totalPatientMessages, emotionByDay, engagementLevel, dailyMessageCounts: dailyCounts, keywords, confusionCount, distressCount, alertEvents, bestHour, worstHour };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-const PaginationControls = ({
-  current, total, onChange,
-}: { current: number; total: number; onChange: (n: number) => void }) => (
+const PaginationControls = ({ current, total, onChange }: { current: number; total: number; onChange: (n: number) => void }) => (
   <div className="flex items-center gap-1 bg-[var(--nura-card)] rounded-lg p-1">
-    <button
-      disabled={current >= total - 1}
-      onClick={e => { e.stopPropagation(); onChange(current + 1); }}
-      className="p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-all"
-    >
-      <ChevronLeft size={15} />
-    </button>
-    <span className="text-[10px] font-bold text-[var(--nura-dim)] uppercase tracking-tight px-1 min-w-[64px] text-center">
-      {current === 0 ? 'This week' : `Week −${current}`}
-    </span>
-    <button
-      disabled={current <= 0}
-      onClick={e => { e.stopPropagation(); onChange(current - 1); }}
-      className="p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-all"
-    >
-      <ChevronRight size={15} />
-    </button>
+    <button disabled={current >= total - 1} onClick={e => { e.stopPropagation(); onChange(current + 1); }} className="p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-all"><ChevronLeft size={15} /></button>
+    <span className="text-[10px] font-bold text-[var(--nura-dim)] uppercase tracking-tight px-1 min-w-[64px] text-center">{current === 0 ? 'This week' : `Week −${current}`}</span>
+    <button disabled={current <= 0} onClick={e => { e.stopPropagation(); onChange(current - 1); }} className="p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-all"><ChevronRight size={15} /></button>
   </div>
 );
 
@@ -403,9 +306,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // ─── Report generator ─────────────────────────────────────────────────────────
-function generateReport({
-  patient, w, avgScore, insights, emotionChange, confusionChange, engagementChange,
-}: {
+function generateReport({ patient, w, avgScore, insights, emotionChange, confusionChange, engagementChange }: {
   patient: PatientProfile;
   w: WeekData;
   avgScore: number;
@@ -426,32 +327,14 @@ function generateReport({
     hour: '2-digit', minute: '2-digit',
   });
 
-  // Emotion bar for each day
   const dayRows = w.emotionByDay.map(d => {
     const barW = d.hasData ? Math.round(d.score) : 0;
     const barColor = d.score >= 68 ? '#22c55e' : d.score >= 48 ? '#6366f1' : d.score >= 36 ? '#f59e0b' : '#ef4444';
-    return `
-      <tr>
-        <td style="padding:6px 12px 6px 0;font-weight:700;color:#374151;width:40px">${d.day}</td>
-        <td style="padding:6px 8px">
-          ${d.hasData
-            ? `<div style="background:#e5e7eb;border-radius:4px;height:14px;overflow:hidden">
-                 <div style="background:${barColor};height:100%;width:${barW}%;border-radius:4px;transition:width 0.3s"></div>
-               </div>`
-            : `<span style="color:#9ca3af;font-size:11px">No session</span>`}
-        </td>
-        <td style="padding:6px 0 6px 8px;text-align:right;font-weight:600;color:#374151;white-space:nowrap">
-          ${d.hasData ? `${d.emoji} ${d.emotion} (${d.score})` : '—'}
-        </td>
-      </tr>`;
+    return `<tr><td style="padding:6px 12px 6px 0;font-weight:700;color:#374151;width:40px">${d.day}</td><td style="padding:6px 8px">${d.hasData ? `<div style="background:#e5e7eb;border-radius:4px;height:14px;overflow:hidden"><div style="background:${barColor};height:100%;width:${barW}%;border-radius:4px;transition:width 0.3s"></div></div>` : `<span style="color:#9ca3af;font-size:11px">No session</span>`}</td><td style="padding:6px 0 6px 8px;text-align:right;font-weight:600;color:#374151;white-space:nowrap">${d.hasData ? `${d.emoji} ${d.emotion} (${d.score})` : '—'}</td></tr>`;
   }).join('');
 
-  // Keywords
-  const keywordBadges = w.keywords.map(k =>
-    `<span style="display:inline-block;background:#ede9fe;color:#4f46e5;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;margin:3px">${k.text} ×${k.count}</span>`
-  ).join('');
+  const keywordBadges = w.keywords.map(k => `<span style="display:inline-block;background:#ede9fe;color:#4f46e5;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;margin:3px">${k.text} ×${k.count}</span>`).join('');
 
-  // Alert events
   const alertSection = w.alertEvents.length > 0
     ? w.alertEvents.map(evt => {
         const d = parseDate(evt.timestamp);
@@ -459,7 +342,6 @@ function generateReport({
       }).join('')
     : '<li style="color:#16a34a">✓ No emergency alerts detected this week.</li>';
 
-  // Change badge helper
   const changeBadge = (val: number | null, invertGood = false) => {
     if (val === null) return '';
     const good = invertGood ? val <= 0 : val >= 0;
@@ -468,36 +350,15 @@ function generateReport({
     return `<span style="background:${bg};color:${color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:8px">${val >= 0 ? '+' : ''}${val}</span>`;
   };
 
-  // AI insights sections
-  const insightSummary = insights?.generalSummary
-    ? `<p style="color:#1f2937;line-height:1.7;margin:0">${insights.generalSummary}</p>`
-    : '<p style="color:#6b7280;font-style:italic;margin:0">Insights not available for this week.</p>';
+  const insightSummary = insights?.generalSummary ? `<p style="color:#1f2937;line-height:1.7;margin:0">${insights.generalSummary}</p>` : '<p style="color:#6b7280;font-style:italic;margin:0">Insights not available for this week.</p>';
+  const insightConversations = (insights?.notableConversations?.length ?? 0) > 0 ? insights!.notableConversations.map(c => `<li style="margin-bottom:6px;color:#374151">${c}</li>`).join('') : '<li style="color:#9ca3af;font-style:italic">None recorded.</li>';
+  const insightRecs = (insights?.caregiverRecommendations?.length ?? 0) > 0 ? insights!.caregiverRecommendations.map(r => `<li style="margin-bottom:8px;padding-left:8px;border-left:3px solid #6366f1;color:#1f2937">${r}</li>`).join('') : '<li style="color:#9ca3af;font-style:italic">No specific recommendations this week.</li>';
 
-  const insightConversations = (insights?.notableConversations?.length ?? 0) > 0
-    ? insights!.notableConversations.map(c => `<li style="margin-bottom:6px;color:#374151">${c}</li>`).join('')
-    : '<li style="color:#9ca3af;font-style:italic">None recorded.</li>';
-
-  const insightRecs = (insights?.caregiverRecommendations?.length ?? 0) > 0
-    ? insights!.caregiverRecommendations.map(r =>
-        `<li style="margin-bottom:8px;padding-left:8px;border-left:3px solid #6366f1;color:#1f2937">${r}</li>`
-      ).join('')
-    : '<li style="color:#9ca3af;font-style:italic">No specific recommendations this week.</li>';
-
-  // Daily message mini-chart (text-based)
   const maxCount = Math.max(...w.dailyMessageCounts, 1);
   const msgRows = DAY_LABELS.map((day, i) => {
     const c = w.dailyMessageCounts[i];
     const pct = Math.round((c / maxCount) * 100);
-    return `
-      <tr>
-        <td style="padding:4px 10px 4px 0;font-weight:700;color:#374151;width:36px;font-size:12px">${day}</td>
-        <td style="padding:4px 6px">
-          <div style="background:#e5e7eb;border-radius:4px;height:10px;overflow:hidden">
-            <div style="background:#6366f1;height:100%;width:${pct}%;border-radius:4px"></div>
-          </div>
-        </td>
-        <td style="padding:4px 0 4px 8px;text-align:right;color:#6b7280;font-size:12px;width:30px">${c}</td>
-      </tr>`;
+    return `<tr><td style="padding:4px 10px 4px 0;font-weight:700;color:#374151;width:36px;font-size:12px">${day}</td><td style="padding:4px 6px"><div style="background:#e5e7eb;border-radius:4px;height:10px;overflow:hidden"><div style="background:#6366f1;height:100%;width:${pct}%;border-radius:4px"></div></div></td><td style="padding:4px 0 4px 8px;text-align:right;color:#6b7280;font-size:12px;width:30px">${c}</td></tr>`;
   }).join('');
 
   const html = `<!DOCTYPE html>
@@ -536,36 +397,16 @@ function generateReport({
 </head>
 <body>
 <div class="page">
-
-  <!-- Print button (hidden on print) -->
-  <div class="no-print" style="text-align:right;margin-bottom:24px">
-    <button onclick="window.print()" style="background:#6366f1;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">
-      🖨 Print / Save as PDF
-    </button>
-  </div>
-
-  <!-- ── Header ── -->
+  <div class="no-print" style="text-align:right;margin-bottom:24px"><button onclick="window.print()" style="background:#6366f1;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">🖨 Print / Save as PDF</button></div>
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px;gap:16px;flex-wrap:wrap">
-    <div>
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.15em;color:#6366f1;margin-bottom:6px">Weekly Care Report</div>
-      <h1 style="margin-bottom:4px">${name}</h1>
-      <p style="color:#6b7280;font-size:14px">📅 ${w.range}</p>
-    </div>
-    <div style="text-align:right;font-size:12px;color:#9ca3af">
-      <div>Generated</div>
-      <div style="font-weight:700;color:#6b7280">${generated}</div>
-    </div>
+    <div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.15em;color:#6366f1;margin-bottom:6px">Weekly Care Report</div><h1 style="margin-bottom:4px">${name}</h1><p style="color:#6b7280;font-size:14px">📅 ${w.range}</p></div>
+    <div style="text-align:right;font-size:12px;color:#9ca3af"><div>Generated</div><div style="font-weight:700;color:#6b7280">${generated}</div></div>
   </div>
-
-  <!-- ── Patient Details ── -->
   <section>
     <h2><span class="icon" style="background:#ede9fe"></span>Patient Details</h2>
     <table style="font-size:14px">
       <tbody>
-        <tr>
-          <td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600;width:160px">Full Name</td>
-          <td style="padding:6px 0;font-weight:700;color:#111827">${name}</td>
-        </tr>
+        <tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600;width:160px">Full Name</td><td style="padding:6px 0;font-weight:700;color:#111827">${name}</td></tr>
         ${dob ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600">Date of Birth</td><td style="padding:6px 0;font-weight:700;color:#111827">${dob}</td></tr>` : ''}
         ${diagnosis ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600">Diagnosis</td><td style="padding:6px 0;font-weight:700;color:#111827">${diagnosis}</td></tr>` : ''}
         ${caregiver ? `<tr><td style="padding:6px 16px 6px 0;color:#6b7280;font-weight:600">Primary Caregiver</td><td style="padding:6px 0;font-weight:700;color:#111827">${caregiver}</td></tr>` : ''}
@@ -574,117 +415,46 @@ function generateReport({
       </tbody>
     </table>
   </section>
-
   <hr class="divider" />
-
-  <!-- ── Key Metrics ── -->
   <section>
     <h2><span class="icon" style="background:#dbeafe"></span>Key Metrics</h2>
     <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">Avg Emotion Score</div>
-        <div class="stat-value">${Math.round(avgScore)}<span style="font-size:16px;font-weight:600;color:#9ca3af">/100</span></div>
-        ${emotionChange !== null ? `<div class="stat-sub">${changeBadge(emotionChange)} vs prev week</div>` : ''}
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Confusion Events</div>
-        <div class="stat-value">${w.confusionCount}</div>
-        ${confusionChange !== null ? `<div class="stat-sub">${changeBadge(confusionChange, true)} vs prev week</div>` : ''}
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Engagement</div>
-        <div class="stat-value">${w.engagementLevel}<span style="font-size:16px;font-weight:600;color:#9ca3af">%</span></div>
-        ${engagementChange !== null ? `<div class="stat-sub">${changeBadge(engagementChange)} vs prev week</div>` : ''}
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Total Sessions</div>
-        <div class="stat-value">${w.sessionCount}</div>
-        <div class="stat-sub">${w.totalPatientMessages} patient messages</div>
-      </div>
+      <div class="stat-card"><div class="stat-label">Avg Emotion Score</div><div class="stat-value">${Math.round(avgScore)}<span style="font-size:16px;font-weight:600;color:#9ca3af">/100</span></div>${emotionChange !== null ? `<div class="stat-sub">${changeBadge(emotionChange)} vs prev week</div>` : ''}</div>
+      <div class="stat-card"><div class="stat-label">Confusion Events</div><div class="stat-value">${w.confusionCount}</div>${confusionChange !== null ? `<div class="stat-sub">${changeBadge(confusionChange, true)} vs prev week</div>` : ''}</div>
+      <div class="stat-card"><div class="stat-label">Engagement</div><div class="stat-value">${w.engagementLevel}<span style="font-size:16px;font-weight:600;color:#9ca3af">%</span></div>${engagementChange !== null ? `<div class="stat-sub">${changeBadge(engagementChange)} vs prev week</div>` : ''}</div>
+      <div class="stat-card"><div class="stat-label">Total Sessions</div><div class="stat-value">${w.sessionCount}</div><div class="stat-sub">${w.totalPatientMessages} patient messages</div></div>
     </div>
   </section>
-
   <hr class="divider" />
-
-  <!-- ── Activity & Responsiveness ── -->
   <section>
     <h2><span class="icon" style="background:#dcfce7"></span>Activity &amp; Responsiveness</h2>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-      <div>
-        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Daily Messages</p>
-        <table style="width:100%"><tbody>${msgRows}</tbody></table>
-      </div>
-      <div style="font-size:14px">
-        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Peak Hours</p>
-        <table><tbody>
-          <tr><td style="padding:5px 12px 5px 0;color:#6b7280;font-weight:600">Most Active</td><td style="font-weight:700;color:#111827">${w.bestHour}</td></tr>
-          <tr><td style="padding:5px 12px 5px 0;color:#6b7280;font-weight:600">Least Active</td><td style="font-weight:700;color:#111827">${w.worstHour}</td></tr>
-        </tbody></table>
-      </div>
+      <div><p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Daily Messages</p><table style="width:100%"><tbody>${msgRows}</tbody></table></div>
+      <div style="font-size:14px"><p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Peak Hours</p><table><tbody><tr><td style="padding:5px 12px 5px 0;color:#6b7280;font-weight:600">Most Active</td><td style="font-weight:700;color:#111827">${w.bestHour}</td></tr><tr><td style="padding:5px 12px 5px 0;color:#6b7280;font-weight:600">Least Active</td><td style="font-weight:700;color:#111827">${w.worstHour}</td></tr></tbody></table></div>
     </div>
   </section>
-
   <hr class="divider" />
-
-  <!-- ── Emotion by Day ── -->
   <section>
     <h2><span class="icon" style="background:#fce7f3"></span>Emotional Wellbeing by Day</h2>
     <table style="width:100%"><tbody>${dayRows}</tbody></table>
   </section>
-
   <hr class="divider" />
-
-  <!-- ── Safety Alerts ── -->
   <section>
     <h2><span class="icon" style="background:${w.alertEvents.length > 0 ? '#fee2e2' : '#dcfce7'}"></span>Safety Monitoring</h2>
     <div class="alert-box ${w.alertEvents.length > 0 ? 'alert-warn' : 'alert-ok'}">
-      <p style="font-weight:800;font-size:14px;margin-bottom:8px;color:${w.alertEvents.length > 0 ? '#dc2626' : '#16a34a'}">
-        ${w.alertEvents.length > 0 ? `⚠ ${w.alertEvents.length} Emergency Alert${w.alertEvents.length !== 1 ? 's' : ''} Detected` : '✓ No Critical Alerts This Week'}
-      </p>
+      <p style="font-weight:800;font-size:14px;margin-bottom:8px;color:${w.alertEvents.length > 0 ? '#dc2626' : '#16a34a'}">${w.alertEvents.length > 0 ? `⚠ ${w.alertEvents.length} Emergency Alert${w.alertEvents.length !== 1 ? 's' : ''} Detected` : '✓ No Critical Alerts This Week'}</p>
       <ul style="list-style:none;padding:0;font-size:13px">${alertSection}</ul>
     </div>
     ${w.distressCount > 0 ? `<p style="margin-top:10px;font-size:13px;color:#92400e;background:#fef3c7;padding:8px 14px;border-radius:8px">⚠ ${w.distressCount} distress-related message${w.distressCount !== 1 ? 's' : ''} detected during the week. Review session logs for context.</p>` : ''}
   </section>
-
   <hr class="divider" />
-
-  <!-- ── Keywords ── -->
-  ${w.keywords.length > 0 ? `
-  <section>
-    <h2><span class="icon" style="background:#e0f2fe"></span>Common Topics</h2>
-    <div style="margin-top:4px">${keywordBadges}</div>
-  </section>
-  <hr class="divider" />
-  ` : ''}
-
-  <!-- ── AI Insights ── -->
+  ${w.keywords.length > 0 ? `<section><h2><span class="icon" style="background:#e0f2fe"></span>Common Topics</h2><div style="margin-top:4px">${keywordBadges}</div></section><hr class="divider" />` : ''}
   <section>
     <h2><span class="icon" style="background:#ede9fe"></span>AI Caregiver Insights</h2>
-    ${insights ? `
-    <div style="margin-bottom:20px">
-      <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">General Summary</p>
-      ${insightSummary}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-      <div>
-        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Notable Conversations</p>
-        <ul style="font-size:13px;line-height:1.7">${insightConversations}</ul>
-      </div>
-      <div>
-        <p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Caregiver Recommendations</p>
-        <ul style="list-style:none;padding:0;font-size:13px">${insightRecs}</ul>
-      </div>
-    </div>
-    ` : '<p style="color:#9ca3af;font-size:13px;font-style:italic">AI insights were not available for this week.</p>'}
+    ${insights ? `<div style="margin-bottom:20px"><p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">General Summary</p>${insightSummary}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:24px"><div><p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Notable Conversations</p><ul style="font-size:13px;line-height:1.7">${insightConversations}</ul></div><div><p style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Caregiver Recommendations</p><ul style="list-style:none;padding:0;font-size:13px">${insightRecs}</ul></div></div>` : '<p style="color:#9ca3af;font-size:13px;font-style:italic">AI insights were not available for this week.</p>'}
   </section>
-
-  <!-- ── Footer ── -->
   <hr class="divider" />
-  <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.8">
-    <p>This report was auto-generated by the Nura Care platform on ${generated}.</p>
-    <p>It is intended for use by authorised caregivers only. Not a substitute for professional medical advice.</p>
-  </div>
-
+  <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.8"><p>This report was auto-generated by the Nura Care platform on ${generated}.</p><p>It is intended for use by authorised caregivers only. Not a substitute for professional medical advice.</p></div>
 </div>
 </body>
 </html>`;
@@ -717,7 +487,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       buckets[bounds.key].push(log);
     }
 
-    // Global max for engagement normalisation
     let globalMaxMessages = 1;
     for (const sessions of Object.values(buckets)) {
       const total = sessions.reduce((s, log) =>
@@ -725,7 +494,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       if (total > globalMaxMessages) globalMaxMessages = total;
     }
 
-    const sorted = Object.keys(buckets).sort().reverse(); // newest first
+    const sorted = Object.keys(buckets).sort().reverse(); 
     return { weeksSorted: sorted, globalMaxMessages };
   }, [logs]);
 
@@ -744,7 +513,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   const currentWeek: WeekData | null = allWeekData[weekIndex] ?? null;
 
-  // ── LLM insights generation ─────────────────────────────────────────────────
+  // ── LLM insights generation via Python Backend ────────────────────────────────
   useEffect(() => {
     if (!currentWeek) return;
     const key = currentWeek.weekKey;
@@ -754,30 +523,31 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const generate = async () => {
       setIsGenerating(true);
       try {
-        const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY });
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: buildInsightsPrompt(patientName, currentWeek),
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                generalSummary: { type: Type.STRING },
-                notableConversations: { type: Type.ARRAY, items: { type: Type.STRING } },
-                caregiverRecommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-              },
-              required: ["generalSummary", "notableConversations", "caregiverRecommendations"]
-            }
-          }
+        const avgScore = currentWeek.emotionByDay.filter(d => d.hasData).reduce((s,d) => s+d.score, 0) / (currentWeek.emotionByDay.filter(d => d.hasData).length || 1);
+        
+        // Using the Python Backend Route!
+        const response = await fetch('http://127.0.0.1:8000/api/analytics/insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientName: patientName,
+            weekRange: currentWeek.range,
+            sessionCount: currentWeek.sessionCount,
+            totalMessages: currentWeek.totalPatientMessages,
+            avgScore: Math.round(avgScore),
+            confusionCount: currentWeek.confusionCount,
+            distressCount: currentWeek.distressCount,
+            alertCount: currentWeek.alertEvents.length,
+            topKeywords: currentWeek.keywords.slice(0, 5).map(k => k.text)
+          })
         });
         
-        const text = response.text || "{}";
-        const parsed = JSON.parse(text) as WeeklyInsights;
+        if (!response.ok) throw new Error("Backend request failed");
+        const parsed = await response.json() as WeeklyInsights;
         setLlmInsights(prev => ({ ...prev, [key]: parsed }));
+
       } catch (err) {
         console.error("Failed to generate insights", err);
-        // Fallback to rule-based insights
         const w = currentWeek;
         const fallback: WeeklyInsights = {
           generalSummary: w.sessionCount > 0 
@@ -839,7 +609,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     ? w.engagementLevel - prevWeek.engagementLevel
     : null;
 
-  // Chart data — only days with data get a dot, rest show neutral line
   const chartData = w.emotionByDay;
 
   return (
@@ -847,7 +616,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
       {/* ── Top Row: Alerts & AI Insights ─────────────────────────────────── */}
       <div className="flex flex-col gap-6">
-        {/* Alerts */}
         <section className={`p-6 rounded-3xl border flex flex-col ${
           w.alertEvents.length > 0
             ? 'bg-[var(--nura-card)] border-red-500/30'
@@ -892,7 +660,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           )}
         </section>
 
-        {/* AI Insights */}
         <section className="bg-[var(--nura-card)] p-6 rounded-3xl border border-white/5 flex flex-col">
           <h4 className="flex items-center gap-2 text-sm font-bold text-[var(--nura-dim)] uppercase tracking-widest mb-4">
             <Sparkles size={14} className="text-indigo-400" />
@@ -901,7 +668,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           {isGenerating ? (
             <div className="flex items-center justify-center flex-1 gap-3 py-6 text-[var(--nura-dim)]">
               <Loader2 size={18} className="animate-spin text-indigo-400" />
-              <span className="text-sm font-medium">Analysing session data…</span>
+              <span className="text-sm font-medium">Analysing session data via Python Backend…</span>
             </div>
           ) : insights ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
@@ -958,8 +725,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
       {/* ── C + D. Emotion chart + Engagement ──────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-        {/* C. Emotion & Cognitive Trend */}
         <section className="bg-[var(--nura-card)] p-8 rounded-3xl border border-white/5">
           <div className="flex items-center justify-between mb-6">
             <h3 className="flex items-center gap-3 text-xl font-bold text-indigo-100">
@@ -1031,7 +796,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
         </section>
 
-        {/* D. Engagement Progress */}
         <div className="space-y-8">
           <section className="bg-[var(--nura-card)] p-8 rounded-3xl border border-white/5">
             <div className="flex items-center justify-between mb-4">
@@ -1121,7 +885,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
           </section>
 
-          {/* E. Common Keywords */}
           <section className="bg-[var(--nura-card)] p-8 rounded-3xl border border-white/5">
             <div className="flex items-center justify-between mb-6">
               <h3 className="flex items-center gap-3 text-xl font-bold text-indigo-100">
@@ -1172,7 +935,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* ── B. Weekly Summary (Stats) ──────────────────────────────────── */}
+      {/* ── E. Weekly Summary (Stats) ──────────────────────────────────── */}
       <section className="bg-[var(--nura-card)] p-10 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
         <div className="absolute top-0 left-0 p-8">
           <PaginationControls

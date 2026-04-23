@@ -45,7 +45,7 @@ _gemini_model: Any = None
 def get_gemini_model():
     global _gemini_model
     if _gemini_model is None:
-        api_key = "AIzaSyCQibcYJwI_KxzoA0RIJ3y3T94Mv7sTvbI"
+        api_key = "api_key"
         if not api_key:
             logger.error("[LLM] 未找到 GEMINI_API_KEY 环境变量。")
             raise ValueError("需要配置 GEMINI_API_KEY 环境变量")

@@ -14,7 +14,7 @@ class WeeklyInsights(BaseModel):
 
 # 2. Initialize the Gemini Client
 # Replace this string with the VITE_GEMINI_API_KEY you removed from React!
-GEMINI_API_KEY = "AIzaSyCQibcYJwI_KxzoA0RIJ3y3T94Mv7sTvbI"
+GEMINI_API_KEY = "api_key"
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 def generate_weekly_insights(
